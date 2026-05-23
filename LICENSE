@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2026 shprot
+Copyright (c) 2026 Shprot
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -19,3 +19,35 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+
+Third-Party Software Credits and Licenses:
+
+This repository bundles or depends on the following third-party open-source 
+components, which are governed by their respective licenses:
+
+1. zapret (DPI bypass core utility)
+   - Developed by bol-van
+   - Licensed under the MIT License
+
+2. zapret-discord-youtube (UI scripts and configuration basis)
+   - Developed by Flowseal
+   - Licensed under the MIT License
+
+3. WinDivert (Network packet capture driver)
+   - Developed by basil00
+   - Licensed under the GNU Lesser General Public License (LGPL) Version 3 
+     or GNU General Public License (GPL) Version 2
+
+4. Happ VPN (Network routing tool)
+   - Developed by Flyfrog LLC
+   - All original rights belong to their respective owners
+
+5. ZPRTX (DPI bypass utility and control launcher)
+   - Modified and streamlined by Shprot
+   - Based on core technologies by bol-van, Flowseal, and Lux1de
+   - Licensed under the MIT License
+
+By retaining this notice, this project fully complies with the licensing terms 
+and original copyright requirements of all included components.
