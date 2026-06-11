@@ -31,23 +31,25 @@ components, which are governed by their respective licenses:
    - Developed by bol-van
    - Licensed under the MIT License
 
-2. zapret-discord-youtube (UI scripts and configuration basis)
-   - Developed by Flowseal
-   - Licensed under the MIT License
-
-3. WinDivert (Network packet capture driver)
+2. WinDivert (Network packet capture driver)
    - Developed by basil00
    - Licensed under the GNU Lesser General Public License (LGPL) Version 3 
      or GNU General Public License (GPL) Version 2
 
-4. Happ VPN (Network routing tool)
+3. Happ VPN (Network routing tool)
    - Developed by Flyfrog LLC
    - All original rights belong to their respective owners
 
-5. ZPRTX (DPI bypass utility and control launcher)
+4. ZPRTX (DPI bypass utility and control launcher)
    - Modified and streamlined by Shprot
    - Based on core technologies by bol-van, Flowseal, and Lux1de
    - Licensed under the MIT License
+
+5. Cloudflare One Client / WARP (Network routing tunnel)
+   - Developed and owned by Cloudflare, Inc.
+   - Subject to the Cloudflare Terms of Service and WARP Privacy Policy. 
+     Used "as-is" in conjunction with routing tools to provide secure and 
+     stable connections to AI services.
 
 By retaining this notice, this project fully complies with the licensing terms 
 and original copyright requirements of all included components.
