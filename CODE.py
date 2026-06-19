@@ -13,12 +13,12 @@ import customtkinter as ctk
 from PIL import Image
 import pystray
 
-# ─── version & urls ───────────────────────────────────────────────────────────
+#version & urls 
 
-CURRENT_VERSION = "17.06.26"
+CURRENT_VERSION = "20.06.26"
 UPDATE_URL      = "https://raw.githubusercontent.com/shprttx/Proximity/main/update.json"
 
-# ─── design tokens ────────────────────────────────────────────────────────────
+#design tokens 
 
 COLOR_MAIN      = "#00f2ff"
 COLOR_SECONDARY = "#00c8d4"
@@ -31,7 +31,7 @@ FONT_NAME       = "Segoe UI"
 
 PULSE_COLORS = ["#00f2ff", "#1ae5ff", "#33d8ff", "#4dcaff", "#66bdff", "#4dcaff", "#33d8ff", "#1ae5ff"]
 
-# ─── system ───────────────────────────────────────────────────────────────────
+#system
 
 def resource_path(relative_path):
     try:
@@ -48,7 +48,7 @@ TOOLS_DIR        = resource_path("Tools")
 CREATE_NO_WINDOW = 0x08000000
 ICON_PATH        = os.path.join(TOOLS_DIR, "Proximity.ico")
 
-# ─── helpers ──────────────────────────────────────────────────────────────────
+#helpers
 
 def color_fade(c1, c2, steps):
     r1, g1, b1 = int(c1[1:3], 16), int(c1[3:5], 16), int(c1[5:7], 16)
@@ -72,7 +72,7 @@ def play_ui_sound(sound_type):
     if os.path.exists(path):
         threading.Thread(target=winsound.PlaySound, args=(path, winsound.SND_FILENAME), daemon=True).start()
 
-# ─── locales ──────────────────────────────────────────────────────────────────
+#locales
 
 LOCALES = {
     "EN": {
@@ -141,7 +141,7 @@ LOCALES = {
     },
 }
 
-# ─── bubble background ────────────────────────────────────────────────────────
+#bubble
 
 class BubbleBackground(ctk.CTkCanvas):
     def __init__(self, master, **kwargs):
@@ -200,7 +200,7 @@ class BubbleBackground(ctk.CTkCanvas):
                 self._spawn(init=False)
         self.after(16, self._loop)
 
-# ─── update notification window ───────────────────────────────────────────────
+#update notification
 
 class UpdateNotificationWindow(ctk.CTkToplevel):
     def __init__(self, parent, lang, update_data):
@@ -269,7 +269,7 @@ class UpdateNotificationWindow(ctk.CTkToplevel):
         self._pulsing      = False
         self.after(80, self._fade_in)
 
-    # ── animation chain ──────────────────────────────────────────────────────
+    #animation chain
 
     def _fade_in(self, alpha=0.0):
         alpha = min(alpha + 0.07, 1.0)
@@ -377,7 +377,7 @@ class UpdateNotificationWindow(ctk.CTkToplevel):
         except Exception:
             return False
 
-# ─── custom warning dialog ────────────────────────────────────────────────────
+#custom warning
 
 class CustomWarningWindow(ctk.CTkToplevel):
     def __init__(self, parent, lang, callback_yes, callback_no):
@@ -429,11 +429,11 @@ class CustomWarningWindow(ctk.CTkToplevel):
         )
         btn_no.pack(pady=4, fill="x", padx=30)
 
-# ─── main application ─────────────────────────────────────────────────────────
+#main
 
 class ProximityApp(ctk.CTk):
 
-    # ── init ─────────────────────────────────────────────────────────────────
+    #init
 
     def __init__(self):
         super().__init__()
@@ -450,7 +450,7 @@ class ProximityApp(ctk.CTk):
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
         self.bind("<Unmap>", self._on_minimize)
 
-        # toggle states
+        # toggle
         self.var_happ  = ctk.StringVar(value="off")
         self.var_tg    = ctk.StringVar(value="off")
         self.var_zprtx = ctk.StringVar(value="off")
@@ -467,7 +467,7 @@ class ProximityApp(ctk.CTk):
         self.withdraw()
         self._show_splash()
 
-    # ── update check ─────────────────────────────────────────────────────────
+    # pdate check
 
     def _check_for_updates(self):
         def fetch():
@@ -481,7 +481,7 @@ class ProximityApp(ctk.CTk):
                 pass
         threading.Thread(target=fetch, daemon=True).start()
 
-    # ── splash ───────────────────────────────────────────────────────────────
+    #splash
 
     def _show_splash(self):
         W, H = 480, 300
@@ -634,7 +634,7 @@ class ProximityApp(ctk.CTk):
             if self.update_data:
                 self.after(200, lambda: UpdateNotificationWindow(self, self.current_lang, self.update_data))
 
-    # ── main ui ──────────────────────────────────────────────────────────────
+    #ui
 
     def _build_main_ui(self):
         self.bg_canvas = BubbleBackground(self)
@@ -681,7 +681,7 @@ class ProximityApp(ctk.CTk):
         self.sw_zprtx_widget = self._create_switch(scroll_frame, LOCALES[self.current_lang]["sw_zprtx"], self.toggle_zprtx, self.var_zprtx, "info_zprtx", "zprtx")
         self.sw_warp_widget  = self._create_switch(scroll_frame, LOCALES[self.current_lang]["sw_warp"],  self.toggle_warp,  self.var_warp,  "info_warp",  "warp")
 
-        # restore arrow button states to match current StringVar values
+        
         self._sync_open_buttons()
 
         self.btn_installer = self._create_button(self.main_container, LOCALES[self.current_lang]["btn_installer"], self.open_installer_window, is_accent=True, sound=None)
@@ -719,7 +719,7 @@ class ProximityApp(ctk.CTk):
         except Exception:
             pass
 
-    # ── widget factories ─────────────────────────────────────────────────────
+    #widge
 
     def _create_switch(self, parent, text, command, var, info_key, id_key):
         row = ctk.CTkFrame(parent, fg_color="transparent")
@@ -784,7 +784,7 @@ class ProximityApp(ctk.CTk):
         btn.pack(pady=8, fill="x", padx=30)
         return btn
 
-    # ── app launchers ─────────────────────────────────────────────────────────
+    #launch
 
     def _launch_happ(self):
         desktop = os.path.join(os.path.expanduser("~"), "Desktop")
@@ -829,7 +829,7 @@ class ProximityApp(ctk.CTk):
         elif id_key == "zprtx":
             webbrowser.open("https://github.com/shprttx")
 
-    # ── tray ─────────────────────────────────────────────────────────────────
+    #tra
 
     def _on_minimize(self, event):
         if event.widget == self and str(self.state()) == "iconic":
@@ -863,7 +863,7 @@ class ProximityApp(ctk.CTk):
         self.deiconify()
         self.state("normal")
 
-    # ── language ─────────────────────────────────────────────────────────────
+    #language
 
     def toggle_language(self):
         self.current_lang = "RU" if self.current_lang == "EN" else "EN"
@@ -884,7 +884,7 @@ class ProximityApp(ctk.CTk):
         try_cfg(self.btn_inst,                     text=l["btn_pdf"])
         try_cfg(self.btn_about,                    text=l["btn_about"])
 
-    # ── close / warning ──────────────────────────────────────────────────────
+    #close / warning
 
     def on_closing(self):
         if "on" in (self.var_happ.get(), self.var_tg.get(),
@@ -902,7 +902,7 @@ class ProximityApp(ctk.CTk):
             if isinstance(w, ctk.CTkToplevel):
                 w.grab_release()
                 w.destroy()
-        # Re-sync arrow buttons in case the widget tree was touched
+       
         self._sync_open_buttons()
 
     def _force_close(self):
@@ -913,7 +913,7 @@ class ProximityApp(ctk.CTk):
         self.bg_canvas.stop_animation()
         self.quit()
 
-    # ── screens ──────────────────────────────────────────────────────────────
+    #screens
 
     def show_main_screen(self):
         self._populate_main_screen()
@@ -923,7 +923,7 @@ class ProximityApp(ctk.CTk):
         for w in self.main_container.winfo_children():
             w.destroy()
 
-        # header bar
+        # header
         hdr = ctk.CTkFrame(self.main_container, fg_color="#161618", corner_radius=0, height=48)
         hdr.pack(fill="x")
         hdr.pack_propagate(False)
@@ -1003,7 +1003,7 @@ class ProximityApp(ctk.CTk):
         for w in self.main_container.winfo_children():
             w.destroy()
 
-        # top accent line
+        # top accent
         top_line = ctk.CTkCanvas(self.main_container, height=2, bg=COLOR_FRAME, highlightthickness=0)
         top_line.pack(fill="x")
         top_line.create_line(0, 1, 460, 1, fill=COLOR_MAIN, width=2)
@@ -1048,7 +1048,7 @@ class ProximityApp(ctk.CTk):
         btn_back.bind("<Leave>", lambda e: btn_back.configure(text_color=COLOR_MAIN))
         btn_back.pack(fill="x")
 
-    # ── installer helpers ────────────────────────────────────────────────────
+    #installe
 
     def open_installer_window(self):
         play_ui_sound("master")
@@ -1069,7 +1069,7 @@ class ProximityApp(ctk.CTk):
     def open_about(self):
         webbrowser.open("https://freeweb-376.pages.dev/Proximity")
 
-    # ── toggle handlers ──────────────────────────────────────────────────────
+    #toggle handlers
 
     def toggle_happ(self, var):
         if var.get() == "on":
@@ -1127,7 +1127,7 @@ class ProximityApp(ctk.CTk):
         else:
             self.open_buttons["zprtx"].configure(state="disabled", fg_color="transparent",
                                                  border_color="#222230", text_color="#555566")
-            # also disable WARP which depends on ZPRTX
+            
             if self.var_warp.get() == "on":
                 self.var_warp.set("off")
                 self.switch_widgets["warp"].deselect()
@@ -1160,7 +1160,7 @@ class ProximityApp(ctk.CTk):
             subprocess.run('taskkill /IM "Cloudflare WARP.exe" /F',
                            shell=True, creationflags=CREATE_NO_WINDOW)
 
-# ─── entry point ──────────────────────────────────────────────────────────────
+#
 
 if __name__ == "__main__":
     app = ProximityApp()
