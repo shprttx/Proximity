@@ -45,7 +45,7 @@
 | 🌐 **Happ VPN** | продвинутый инструмент маршрутизации и конфигураций для управления трафиком. *Инструкция и установщик вшиты.* | [**Happ**](https://github.com/Happ-proxy) |
 | ✈️ **TG Proxy** | Локальный MTProto-прокси для Telegram Desktop, который ускоряет работу Telegram, перенаправляя трафик через WebSocket-соединения. Данные передаются в том же зашифрованном виде, а для работы не нужны сторонние серверы. | [**Flowseal**](https://github.com/Flowseal) |
 | 🧡 **Cloudflare WARP** | Утилита, объединяющая функции VPN и безопасного DNS-резолвера. Ускоряет загрузку сайтов и открывает доступ к зарубежным ИИ-моделям (Gemini, Claude, ChatGPT). | [**Cloudflare, Inc.**](https://one.one.one.one) |
-| 👾 **ZPRTX** | Сборка, объединившая в себе версию от **Lux1de** и версию от **Flowseal**. Вся утилита сведена к **1 стратегии `general (ALT)` для YouTube, Discord, Roblox**. | [**Shprot**](https://github.com/shprttx) |
+| 👾 **ZPRTX** | Сборка, объединившая в себе версию от **Lux1de** и версию от **Flowseal**. | [**Shprot**](https://github.com/shprttx) |
 
 
 
