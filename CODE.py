@@ -15,7 +15,7 @@ import pystray
 
 #version & urls 
 
-CURRENT_VERSION = "20.06.26"
+CURRENT_VERSION = "26.06.26"
 UPDATE_URL      = "https://raw.githubusercontent.com/shprttx/Proximity/main/update.json"
 
 #design tokens 
@@ -84,7 +84,7 @@ LOCALES = {
         "sw_warp":         "Cloudflare WARP",
         "btn_installer":   "SETUP WIZARD",
         "btn_pdf":         "Happ + Cloudflare WARP Manual",
-        "btn_about":       "WEBSITE",
+        "btn_about":       "GITHUB",
         "installer_title": "SETUP WIZARD",
         "installer_label": "Select what you want to install",
         "installer_happ":  "INSTALL HAPP",
@@ -103,9 +103,9 @@ LOCALES = {
         "tray_exit":       "Exit",
         "upd_title":       "UPDATE AVAILABLE",
         "upd_msg":         "A new version of the application is available.\nPlease update to ensure stable performance.\nThe changelog is available on GitHub.",
-        "upd_warn":        "NOTE: The download website only works\nwith ZPRTX enabled (or any other DPI bypass / VPN).",
-        "btn_upd_site":    "Update via Website",
-        "btn_upd_gh":      "Update via GitHub",
+        "upd_warn":        "NOTE: The website is temporarily unavailable,\nplease use instant download instead.",
+        "btn_upd_site":    "Instant Download",
+        "btn_upd_gh":      "Changelog",
     },
     "RU": {
         "lang_btn":        "EN",
@@ -116,7 +116,7 @@ LOCALES = {
         "sw_warp":         "Cloudflare WARP",
         "btn_installer":   "МАСТЕР УСТАНОВКИ",
         "btn_pdf":         "Инструкция Happ + Cloudflare WARP",
-        "btn_about":       "САЙТ",
+        "btn_about":       "GITHUB",
         "installer_title": "МАСТЕР УСТАНОВКИ",
         "installer_label": "Выберите что хотите установить",
         "installer_happ":  "УСТАНОВИТЬ HAPP",
@@ -135,9 +135,9 @@ LOCALES = {
         "tray_exit":       "Выход",
         "upd_title":       "ДОСТУПНО ОБНОВЛЕНИЕ",
         "upd_msg":         "Вышло новое обновление приложения.\nПожалуйста, обновитесь для стабильной работы.\nСписок изменений доступен на GitHub.",
-        "upd_warn":        "ВНИМАНИЕ: Сайт скачивания работает только\nс включенным ZPRTX (или любым другим DPI-обходом / VPN).",
-        "btn_upd_site":    "Обновить на сайте",
-        "btn_upd_gh":      "Обновить на GitHub",
+        "upd_warn":        "ВНИМАНИЕ: Сайт временно приостановил свою работу,\nвоспользуйтесь мгновенным скачиванием.",
+        "btn_upd_site":    "Мгновенное скачивание",
+        "btn_upd_gh":      "Список изменений",
     },
 }
 
@@ -224,7 +224,6 @@ class UpdateNotificationWindow(ctk.CTkToplevel):
             self.after(200, lambda: self.iconbitmap(ICON_PATH))
 
         release_url = update_data.get("release_url", "https://github.com/shprttx/Proximity/releases")
-        site_url    = "https://freeweb-376.pages.dev/Proximity"
 
         self._canvas = ctk.CTkCanvas(self, bg=COLOR_BG, highlightthickness=0, width=WIN_W, height=WIN_H)
         self._canvas.place(x=0, y=0, relwidth=1, relheight=1)
@@ -241,28 +240,28 @@ class UpdateNotificationWindow(ctk.CTkToplevel):
                      ).pack(pady=(0, 4))
 
         ctk.CTkLabel(self._content, text=LOCALES[lang]["upd_warn"],
-                     font=(FONT_NAME, 11, "bold"), justify="center", text_color=COLOR_ACCENT
+                     font=(FONT_NAME, 11, "bold"), justify="center", text_color="#ffffff"
                      ).pack(pady=(0, 12))
-
-        btn_gh = ctk.CTkButton(
-            self._content, text=LOCALES[lang]["btn_upd_gh"],
-            fg_color="transparent", border_width=2, border_color=COLOR_MAIN,
-            hover_color="#0b2e35", corner_radius=10, text_color=COLOR_MAIN,
-            font=(FONT_NAME, 12, "bold"), height=34,
-            command=lambda: [play_ui_sound("click"), webbrowser.open(release_url)]
-        )
-        btn_gh.bind("<Enter>", lambda e: btn_gh.configure(text_color="#ffffff"))
-        btn_gh.bind("<Leave>", lambda e: btn_gh.configure(text_color=COLOR_MAIN))
-        btn_gh.pack(pady=3, fill="x", padx=30)
 
         btn_site = ctk.CTkButton(
             self._content, text=LOCALES[lang]["btn_upd_site"],
+            fg_color="transparent", border_width=2, border_color=COLOR_MAIN,
+            hover_color="#0b2e35", corner_radius=10, text_color=COLOR_MAIN,
+            font=(FONT_NAME, 12, "bold"), height=34,
+            command=lambda: [play_ui_sound("click"), webbrowser.open("https://github.com/shprttx/Proximity/releases/download/26.06.26/Proximity.exe")]
+        )
+        btn_site.bind("<Enter>", lambda e: btn_site.configure(text_color="#ffffff"))
+        btn_site.bind("<Leave>", lambda e: btn_site.configure(text_color=COLOR_MAIN))
+        btn_site.pack(pady=3, fill="x", padx=30)
+
+        btn_gh = ctk.CTkButton(
+            self._content, text=LOCALES[lang]["btn_upd_gh"],
             fg_color="#12121e", border_width=1, border_color=COLOR_BORDER,
             hover_color=COLOR_SECONDARY, corner_radius=10, text_color="#ffffff",
             font=(FONT_NAME, 12, "bold"), height=34,
-            command=lambda: [play_ui_sound("click"), webbrowser.open(site_url)]
+            command=lambda: [play_ui_sound("click"), webbrowser.open("https://github.com/shprttx/Proximity/releases")]
         )
-        btn_site.pack(pady=3, fill="x", padx=30)
+        btn_gh.pack(pady=3, fill="x", padx=30)
 
         self._pulse_colors = PULSE_COLORS
         self._pulse_step   = 0
@@ -1067,7 +1066,7 @@ class ProximityApp(ctk.CTk):
         if os.path.exists(path): os.startfile(path)
 
     def open_about(self):
-        webbrowser.open("https://freeweb-376.pages.dev/Proximity")
+        webbrowser.open("https://github.com/shprttx/Proximity")
 
     #toggle handlers
 
