@@ -15,7 +15,7 @@ import pystray
 
 #version & urls 
 
-CURRENT_VERSION = "26.06.26"
+CURRENT_VERSION = "30.06.26"
 UPDATE_URL      = "https://raw.githubusercontent.com/shprttx/Proximity/main/update.json"
 
 #design tokens 
@@ -200,7 +200,7 @@ class BubbleBackground(ctk.CTkCanvas):
                 self._spawn(init=False)
         self.after(16, self._loop)
 
-#update notification
+#update 
 
 class UpdateNotificationWindow(ctk.CTkToplevel):
     def __init__(self, parent, lang, update_data):
@@ -223,7 +223,8 @@ class UpdateNotificationWindow(ctk.CTkToplevel):
         if os.path.exists(ICON_PATH):
             self.after(200, lambda: self.iconbitmap(ICON_PATH))
 
-        release_url = update_data.get("release_url", "https://github.com/shprttx/Proximity/releases")
+        release_url  = update_data.get("release_url",  "https://github.com/shprttx/Proximity/releases")
+        download_url = update_data.get("download_url", release_url)
 
         self._canvas = ctk.CTkCanvas(self, bg=COLOR_BG, highlightthickness=0, width=WIN_W, height=WIN_H)
         self._canvas.place(x=0, y=0, relwidth=1, relheight=1)
@@ -248,7 +249,7 @@ class UpdateNotificationWindow(ctk.CTkToplevel):
             fg_color="transparent", border_width=2, border_color=COLOR_MAIN,
             hover_color="#0b2e35", corner_radius=10, text_color=COLOR_MAIN,
             font=(FONT_NAME, 12, "bold"), height=34,
-            command=lambda: [play_ui_sound("click"), webbrowser.open("https://github.com/shprttx/Proximity/releases/download/26.06.26/Proximity.exe")]
+            command=lambda u=download_url: [play_ui_sound("click"), webbrowser.open(u)]
         )
         btn_site.bind("<Enter>", lambda e: btn_site.configure(text_color="#ffffff"))
         btn_site.bind("<Leave>", lambda e: btn_site.configure(text_color=COLOR_MAIN))
@@ -259,7 +260,7 @@ class UpdateNotificationWindow(ctk.CTkToplevel):
             fg_color="#12121e", border_width=1, border_color=COLOR_BORDER,
             hover_color=COLOR_SECONDARY, corner_radius=10, text_color="#ffffff",
             font=(FONT_NAME, 12, "bold"), height=34,
-            command=lambda: [play_ui_sound("click"), webbrowser.open("https://github.com/shprttx/Proximity/releases")]
+            command=lambda u=release_url: [play_ui_sound("click"), webbrowser.open(u)]
         )
         btn_gh.pack(pady=3, fill="x", padx=30)
 
@@ -268,7 +269,7 @@ class UpdateNotificationWindow(ctk.CTkToplevel):
         self._pulsing      = False
         self.after(80, self._fade_in)
 
-    #animation chain
+    #animation
 
     def _fade_in(self, alpha=0.0):
         alpha = min(alpha + 0.07, 1.0)
@@ -789,7 +790,7 @@ class ProximityApp(ctk.CTk):
         desktop = os.path.join(os.path.expanduser("~"), "Desktop")
         candidates = [
             os.path.join(desktop, "Happ.lnk"),
-            os.path.join(desktop, "Happ VPN.lnk"),
+            os.path.join(desktop, "Happ.lnk"),
             os.path.join(os.environ.get("ProgramFiles",      "C:\\Program Files"),        "Happ", "Happ.exe"),
             os.path.join(os.environ.get("ProgramFiles(x86)", "C:\\Program Files (x86)"),  "Happ", "Happ.exe"),
             os.path.join(os.environ.get("LocalAppData", ""), "Programs", "Happ", "Happ.exe"),
