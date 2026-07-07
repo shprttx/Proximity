@@ -1,16 +1,16 @@
 {
-  "version": "30.06.26",
-  "release_url": "https://github.com/shprttx/Proximity/releases/tag/30.06.26",
-  "download_url": "https://github.com/shprttx/Proximity/releases/download/30.06.26/Proximity.exe",
+  "version": "07.07.26",
+  "release_url": "https://github.com/shprttx/Proximity/releases/tag/07.07.26",
+  "download_url": "https://github.com/shprttx/Proximity/releases/download/07.07.26/Proximity.exe",
   "notice": {
-    "id": "AAA",
+    "id": "",
     "title": {
-      "ru": "ТЕСТОВОЕ ОПОВЕЩЕНИЕ",
-      "en": "TEST"
+      "ru": "",
+      "en": ""
     },
     "text": {
-      "ru": "Это тестовое оповещение можете закрыть!",
-      "en": "This is a test"
+      "ru": "",
+      "en": ""
     }
   }
 }
