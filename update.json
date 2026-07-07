@@ -3,13 +3,13 @@
   "release_url": "https://github.com/shprttx/Proximity/releases/tag/30.06.26",
   "download_url": "https://github.com/shprttx/Proximity/releases/download/30.06.26/Proximity.exe",
   "notice": {
-    "id": "",
+    "id": "1",
     "title": {
-      "ru": "",
+      "ru": "ТЕСТОВОЕ ОПОВЕЩЕНИЕ",
       "en": ""
     },
     "text": {
-      "ru": "",
+      "ru": "Это тестовое оповещение можете закрыть окно!",
       "en": ""
     }
   }
