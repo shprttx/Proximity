@@ -1,5 +1,16 @@
 {
   "version": "30.06.26",
   "release_url": "https://github.com/shprttx/Proximity/releases/tag/30.06.26",
-  "download_url": "https://github.com/shprttx/Proximity/releases/download/30.06.26/Proximity.exe"
+  "download_url": "https://github.com/shprttx/Proximity/releases/download/30.06.26/Proximity.exe",
+  "notice": {
+    "id": "",
+    "title": {
+      "ru": "",
+      "en": ""
+    },
+    "text": {
+      "ru": "",
+      "en": ""
+    }
+  }
 }
