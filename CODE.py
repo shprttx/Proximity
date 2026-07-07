@@ -9,16 +9,14 @@ import webbrowser
 import winsound
 import urllib.request
 import json
+import socket
 import customtkinter as ctk
 from PIL import Image
 import pystray
+import psutil
 
-#version & urls 
-
-CURRENT_VERSION = "30.06.26"
+CURRENT_VERSION = "07.07.26"
 UPDATE_URL      = "https://raw.githubusercontent.com/shprttx/Proximity/main/update.json"
-
-#design tokens 
 
 COLOR_MAIN      = "#00f2ff"
 COLOR_SECONDARY = "#00c8d4"
@@ -31,7 +29,43 @@ FONT_NAME       = "Segoe UI"
 
 PULSE_COLORS = ["#00f2ff", "#1ae5ff", "#33d8ff", "#4dcaff", "#66bdff", "#4dcaff", "#33d8ff", "#1ae5ff"]
 
-#system
+
+def get_state_dir():
+    base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
+    path = os.path.join(base, "Proximity")
+    try:
+        os.makedirs(path, exist_ok=True)
+    except Exception:
+        pass
+    return path
+
+
+def get_state_path():
+    return os.path.join(get_state_dir(), "state.json")
+
+
+def load_local_state():
+    try:
+        with open(get_state_path(), "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def save_local_state(data):
+    try:
+        with open(get_state_path(), "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False)
+    except Exception:
+        pass
+
+
+def pick_localized(value, lang):
+    if isinstance(value, dict):
+        key = (lang or "").lower()
+        return value.get(key) or value.get("ru") or value.get("en") or ""
+    return value or ""
+
 
 def resource_path(relative_path):
     try:
@@ -40,15 +74,49 @@ def resource_path(relative_path):
         base_path = os.path.abspath(".")
     return os.path.join(base_path, relative_path)
 
+SINGLE_INSTANCE_PORT = 51837
+
 if not ctypes.windll.shell32.IsUserAnAdmin():
+    try:
+        with socket.create_connection(("127.0.0.1", SINGLE_INSTANCE_PORT), timeout=0.3) as c:
+            c.sendall(b"SHOW")
+        sys.exit()
+    except OSError:
+        pass
+
     ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
+    sys.exit()
+
+
+def _acquire_single_instance_lock():
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.bind(("127.0.0.1", SINGLE_INSTANCE_PORT))
+        s.listen(5)
+        return s
+    except OSError:
+        try:
+            with socket.create_connection(("127.0.0.1", SINGLE_INSTANCE_PORT), timeout=2) as c:
+                c.sendall(b"SHOW")
+        except Exception:
+            pass
+        return None
+
+_single_instance_lock = _acquire_single_instance_lock()
+if _single_instance_lock is None:
     sys.exit()
 
 TOOLS_DIR        = resource_path("Tools")
 CREATE_NO_WINDOW = 0x08000000
 ICON_PATH        = os.path.join(TOOLS_DIR, "Proximity.ico")
 
-#helpers
+SERVICE_PROCESS_NAMES = {
+    "happ":  ("happ.exe",),
+    "tg":    ("tgwsproxy_windows.exe",),
+    "zprtx": ("winws.exe",),
+    "warp":  ("cloudflare warp.exe",),
+}
+
 
 def color_fade(c1, c2, steps):
     r1, g1, b1 = int(c1[1:3], 16), int(c1[3:5], 16), int(c1[5:7], 16)
@@ -59,6 +127,24 @@ def color_fade(c1, c2, steps):
         f"{int(b1+(b2-b1)*i/(steps-1)):02x}"
         for i in range(steps)
     ]
+
+
+def get_running_service_keys():
+    running_names = set()
+    for proc in psutil.process_iter(["name"]):
+        try:
+            name = (proc.info.get("name") or "").strip().lower()
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            continue
+        if name:
+            running_names.add(name)
+
+    detected = set()
+    for key, proc_names in SERVICE_PROCESS_NAMES.items():
+        if any(pn in running_names for pn in proc_names):
+            detected.add(key)
+    return detected
+
 
 def play_ui_sound(sound_type):
     sound_map = {
@@ -71,8 +157,6 @@ def play_ui_sound(sound_type):
     path = resource_path(os.path.join("sounds", sound_map.get(sound_type, "")))
     if os.path.exists(path):
         threading.Thread(target=winsound.PlaySound, args=(path, winsound.SND_FILENAME), daemon=True).start()
-
-#locales
 
 LOCALES = {
     "EN": {
@@ -106,6 +190,8 @@ LOCALES = {
         "upd_warn":        "NOTE: The website is temporarily unavailable,\nplease use instant download instead.",
         "btn_upd_site":    "Instant Download",
         "btn_upd_gh":      "Changelog",
+        "notice_title_default": "WARNING",
+        "notice_close":          "Ok",
     },
     "RU": {
         "lang_btn":        "EN",
@@ -138,10 +224,11 @@ LOCALES = {
         "upd_warn":        "ВНИМАНИЕ: Сайт временно приостановил свою работу,\nвоспользуйтесь мгновенным скачиванием.",
         "btn_upd_site":    "Мгновенное скачивание",
         "btn_upd_gh":      "Список изменений",
+        "notice_title_default": "ВНИМАНИЕ",
+        "notice_close":          "Ок",
     },
 }
 
-#bubble
 
 class BubbleBackground(ctk.CTkCanvas):
     def __init__(self, master, **kwargs):
@@ -200,7 +287,6 @@ class BubbleBackground(ctk.CTkCanvas):
                 self._spawn(init=False)
         self.after(16, self._loop)
 
-#update 
 
 class UpdateNotificationWindow(ctk.CTkToplevel):
     def __init__(self, parent, lang, update_data):
@@ -268,8 +354,6 @@ class UpdateNotificationWindow(ctk.CTkToplevel):
         self._pulse_step   = 0
         self._pulsing      = False
         self.after(80, self._fade_in)
-
-    #animation
 
     def _fade_in(self, alpha=0.0):
         alpha = min(alpha + 0.07, 1.0)
@@ -377,7 +461,169 @@ class UpdateNotificationWindow(ctk.CTkToplevel):
         except Exception:
             return False
 
-#custom warning
+
+class NoticeWindow(ctk.CTkToplevel):
+    def __init__(self, parent, lang, notice_data, on_dismiss=None, on_close_show_next=None):
+        super().__init__(parent)
+        self._on_dismiss         = on_dismiss
+        self._on_close_show_next = on_close_show_next
+
+        title = pick_localized(notice_data.get("title"), lang) or LOCALES[lang]["notice_title_default"]
+        body  = pick_localized(notice_data.get("text"),  lang)
+
+        self.title(title)
+        WIN_W, WIN_H = 380, 260
+        self.geometry(f"{WIN_W}x{WIN_H}")
+        self.configure(fg_color=COLOR_BG)
+        self.resizable(False, False)
+        self.transient(parent)
+        self.grab_set()
+        self.attributes("-alpha", 0.0)
+
+        self.update_idletasks()
+        x = parent.winfo_rootx() + (parent.winfo_width()  - WIN_W) // 2
+        y = parent.winfo_rooty() + (parent.winfo_height() - WIN_H) // 2
+        self.geometry(f"+{x}+{y}")
+
+        if os.path.exists(ICON_PATH):
+            self.after(200, lambda: self.iconbitmap(ICON_PATH))
+
+        self._canvas = ctk.CTkCanvas(self, bg=COLOR_BG, highlightthickness=0, width=WIN_W, height=WIN_H)
+        self._canvas.place(x=0, y=0, relwidth=1, relheight=1)
+
+        self._content = ctk.CTkFrame(self, fg_color=COLOR_FRAME, corner_radius=16,
+                                     border_color=COLOR_ACCENT, border_width=2)
+
+        ctk.CTkLabel(self._content, text=title, font=(FONT_NAME, 17, "bold"),
+                     text_color=COLOR_ACCENT, wraplength=320, justify="center"
+                     ).pack(pady=(22, 8), padx=20)
+
+        ctk.CTkLabel(self._content, text=body, font=(FONT_NAME, 12), justify="center",
+                     text_color="#e0e0e0", wraplength=320
+                     ).pack(pady=(0, 10), padx=20)
+
+        btn_ok = ctk.CTkButton(
+            self._content, text=LOCALES[lang]["notice_close"],
+            fg_color="transparent", border_width=2, border_color=COLOR_ACCENT,
+            hover_color="#3a0b16", corner_radius=10, text_color=COLOR_ACCENT,
+            font=(FONT_NAME, 12, "bold"), height=34,
+            command=self._close
+        )
+        btn_ok.bind("<Enter>", lambda e: btn_ok.configure(text_color="#ffffff"))
+        btn_ok.bind("<Leave>", lambda e: btn_ok.configure(text_color=COLOR_ACCENT))
+        btn_ok.pack(pady=(4, 20), fill="x", padx=30, side="bottom")
+
+        self._pulse_colors = ["#ff0844", "#ff2f5c", "#ff4d74", "#ff2f5c"]
+        self._pulse_step   = 0
+        self._pulsing      = False
+        self.after(80, self._fade_in)
+
+    def _fade_in(self, alpha=0.0):
+        alpha = min(alpha + 0.14, 1.0)
+        self.attributes("-alpha", alpha)
+        if alpha < 1.0:
+            self.after(14, lambda: self._fade_in(alpha))
+        else:
+            self._anim_line()
+
+    def _anim_line(self):
+        cx, cy = 190, 120
+        line = self._canvas.create_line(cx, cy, cx, cy, fill=COLOR_ACCENT, width=2)
+        self._line_id = line
+        def grow(w=0):
+            if not self._alive(): return
+            if w < 65:
+                self._canvas.coords(line, cx-w, cy, cx+w, cy)
+                self.after(8, lambda: grow(w+7))
+            else:
+                self._canvas.coords(line, cx-65, cy, cx+65, cy)
+                self._fade_mark()
+        grow()
+
+    def _fade_mark(self):
+        self._pulsing = True
+        self._pulse_loop()
+        cx, cy = 190, 120
+        colors = color_fade(COLOR_BG, COLOR_ACCENT, 14)
+        glows  = color_fade(COLOR_BG, "#550018", 14)
+        def step(i=0):
+            if not self._alive(): return
+            if i < len(colors):
+                self._canvas.delete("notice_mark")
+                for dx, dy in [(-1,0),(1,0),(0,-1),(0,1)]:
+                    self._canvas.create_text(cx+dx, cy-24+dy, text="!", fill=glows[i],
+                                             font=(FONT_NAME, 30, "bold"), tags="notice_mark")
+                self._canvas.create_text(cx, cy-24, text="!", fill=colors[i],
+                                         font=(FONT_NAME, 30, "bold"), tags="notice_mark")
+                self.after(14, lambda: step(i+1))
+            else:
+                self.after(600, self._fade_out_and_show_content)
+        step()
+
+    def _pulse_loop(self):
+        if not self._pulsing or not self._alive(): return
+        cx, cy = 190, 120
+        self._pulse_step = (self._pulse_step + 1) % len(self._pulse_colors)
+        color = self._pulse_colors[self._pulse_step]
+        glow  = color_fade(color, COLOR_BG, 5)[1]
+        try:
+            self._canvas.delete("notice_mark")
+            for dx, dy in [(-1,0),(1,0),(0,-1),(0,1)]:
+                self._canvas.create_text(cx+dx, cy-24+dy, text="!", fill=glow,
+                                         font=(FONT_NAME, 30, "bold"), tags="notice_mark")
+            self._canvas.create_text(cx, cy-24, text="!", fill=color,
+                                     font=(FONT_NAME, 30, "bold"), tags="notice_mark")
+        except Exception:
+            pass
+        self.after(140, self._pulse_loop)
+
+    def _fade_out_and_show_content(self):
+        self._pulsing = False
+        cx, cy  = 190, 120
+        color   = self._pulse_colors[self._pulse_step]
+        c_mark  = color_fade(color,      COLOR_BG, 11)
+        c_line  = color_fade(COLOR_ACCENT, COLOR_BG, 11)
+        def step(i=0):
+            if not self._alive(): return
+            if i < 11:
+                glow = color_fade(color, COLOR_BG, 5)[1]
+                self._canvas.delete("notice_mark")
+                for dx, dy in [(-1,0),(1,0),(0,-1),(0,1)]:
+                    self._canvas.create_text(cx+dx, cy-24+dy, text="!", fill=glow,
+                                             font=(FONT_NAME, 30, "bold"), tags="notice_mark")
+                self._canvas.create_text(cx, cy-24, text="!", fill=c_mark[i],
+                                         font=(FONT_NAME, 30, "bold"), tags="notice_mark")
+                self._canvas.itemconfig(self._line_id, fill=c_line[i])
+                self.after(14, lambda: step(i+1))
+            else:
+                self._canvas.place_forget()
+                self._content.place(x=0, y=0, relwidth=1, relheight=1)
+        step()
+
+    def _alive(self):
+        try:
+            return self.winfo_exists()
+        except Exception:
+            return False
+
+    def _close(self):
+        play_ui_sound("click")
+        if self._on_dismiss:
+            try:
+                self._on_dismiss()
+            except Exception:
+                pass
+        try:
+            self.grab_release()
+        except Exception:
+            pass
+        self.destroy()
+        if self._on_close_show_next:
+            try:
+                self._on_close_show_next()
+            except Exception:
+                pass
+
 
 class CustomWarningWindow(ctk.CTkToplevel):
     def __init__(self, parent, lang, callback_yes, callback_no):
@@ -429,12 +675,8 @@ class CustomWarningWindow(ctk.CTkToplevel):
         )
         btn_no.pack(pady=4, fill="x", padx=30)
 
-#main
 
 class ProximityApp(ctk.CTk):
-
-    #init
-
     def __init__(self):
         super().__init__()
         self.current_lang = "RU"
@@ -450,16 +692,23 @@ class ProximityApp(ctk.CTk):
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
         self.bind("<Unmap>", self._on_minimize)
 
-        # toggle
-        self.var_happ  = ctk.StringVar(value="off")
-        self.var_tg    = ctk.StringVar(value="off")
-        self.var_zprtx = ctk.StringVar(value="off")
-        self.var_warp  = ctk.StringVar(value="off")
+        try:
+            already_running = get_running_service_keys()
+        except Exception:
+            already_running = set()
+
+        self.var_happ  = ctk.StringVar(value="on" if "happ"  in already_running else "off")
+        self.var_tg    = ctk.StringVar(value="on" if "tg"    in already_running else "off")
+        self.var_zprtx = ctk.StringVar(value="on" if "zprtx" in already_running else "off")
+        self.var_warp  = ctk.StringVar(value="on" if "warp"  in already_running else "off")
 
         self.open_buttons   = {}
         self.switch_widgets = {}
         self.tray_icon      = None
         self.update_data    = None
+        self.pending_notice = None
+        self._popup_shown   = False
+        self._zprtx_proc    = None
 
         self._check_for_updates()
 
@@ -467,21 +716,52 @@ class ProximityApp(ctk.CTk):
         self.withdraw()
         self._show_splash()
 
-    # pdate check
-
     def _check_for_updates(self):
         def fetch():
             try:
                 req = urllib.request.Request(UPDATE_URL, headers={"User-Agent": "Mozilla/5.0"})
-                with urllib.request.urlopen(req, timeout=4) as r:
+                with urllib.request.urlopen(req, timeout=8) as r:
                     data = json.loads(r.read().decode("utf-8"))
                     if data.get("version") and data["version"] != CURRENT_VERSION:
                         self.update_data = data
+
+                    notice = data.get("notice")
+                    if isinstance(notice, dict) and notice.get("id"):
+                        state = load_local_state()
+                        if state.get("last_seen_notice_id") != notice.get("id"):
+                            self.pending_notice = notice
             except Exception:
                 pass
+            finally:
+                self.after(0, self._maybe_show_startup_popup)
         threading.Thread(target=fetch, daemon=True).start()
 
-    #splash
+    def _maybe_show_startup_popup(self):
+        if self._popup_shown:
+            return
+        if not self.winfo_viewable():
+            return
+        if self.pending_notice:
+            self._popup_shown = True
+            NoticeWindow(self, self.current_lang, self.pending_notice,
+                        on_dismiss=self._mark_notice_seen,
+                        on_close_show_next=self._show_update_after_notice if self.update_data else None)
+        elif self.update_data:
+            self._popup_shown = True
+            UpdateNotificationWindow(self, self.current_lang, self.update_data)
+
+    def _show_update_after_notice(self):
+        if self.update_data:
+            UpdateNotificationWindow(self, self.current_lang, self.update_data)
+
+    def _mark_notice_seen(self):
+        notice = self.pending_notice
+        if not notice:
+            return
+        state = load_local_state()
+        state["last_seen_notice_id"] = notice.get("id")
+        save_local_state(state)
+        self.pending_notice = None
 
     def _show_splash(self):
         W, H = 480, 300
@@ -631,10 +911,7 @@ class ProximityApp(ctk.CTk):
         if alpha < 1.0:
             self.after(16, lambda: self._fade_in(alpha))
         else:
-            if self.update_data:
-                self.after(200, lambda: UpdateNotificationWindow(self, self.current_lang, self.update_data))
-
-    #ui
+            self.after(200, self._maybe_show_startup_popup)
 
     def _build_main_ui(self):
         self.bg_canvas = BubbleBackground(self)
@@ -649,7 +926,6 @@ class ProximityApp(ctk.CTk):
         self._populate_main_screen()
 
     def _populate_main_screen(self):
-        """Fill main_container with the home screen widgets."""
         for w in self.main_container.winfo_children():
             w.destroy()
 
@@ -661,6 +937,9 @@ class ProximityApp(ctk.CTk):
             command=self.toggle_language
         )
         self.btn_lang.place(relx=0.96, rely=0.03, anchor="ne")
+
+        self.btn_panic = self._create_panic_button(self.main_container)
+        self.btn_panic.place(relx=0.96, rely=0.03, anchor="ne", x=-40)
 
         self.header = ctk.CTkLabel(self.main_container,
                                    text=LOCALES[self.current_lang]["header"],
@@ -681,7 +960,6 @@ class ProximityApp(ctk.CTk):
         self.sw_zprtx_widget = self._create_switch(scroll_frame, LOCALES[self.current_lang]["sw_zprtx"], self.toggle_zprtx, self.var_zprtx, "info_zprtx", "zprtx")
         self.sw_warp_widget  = self._create_switch(scroll_frame, LOCALES[self.current_lang]["sw_warp"],  self.toggle_warp,  self.var_warp,  "info_warp",  "warp")
 
-        
         self._sync_open_buttons()
 
         self.btn_installer = self._create_button(self.main_container, LOCALES[self.current_lang]["btn_installer"], self.open_installer_window, is_accent=True, sound=None)
@@ -693,7 +971,6 @@ class ProximityApp(ctk.CTk):
                      ).pack(side="bottom", pady=12)
 
     def _sync_open_buttons(self):
-        """Light up ↗ buttons for every toggle that is currently ON."""
         mapping = {
             "happ":  self.var_happ,
             "tg":    self.var_tg,
@@ -719,7 +996,72 @@ class ProximityApp(ctk.CTk):
         except Exception:
             pass
 
-    #widge
+    def _create_panic_button(self, parent):
+        ICON_SIZE = 16
+        IDLE_BG    = "#12121e"
+
+        frame = ctk.CTkFrame(parent, width=34, height=24,
+                             fg_color=IDLE_BG, corner_radius=8,
+                             border_width=1, border_color=COLOR_BORDER,
+                             cursor="hand2")
+        frame.pack_propagate(False)
+
+        canvas = ctk.CTkCanvas(frame, width=ICON_SIZE, height=ICON_SIZE,
+                               bg=IDLE_BG, highlightthickness=0, cursor="hand2")
+        canvas.pack(expand=True)
+
+        def draw(color):
+            canvas.delete("all")
+            cx = cy = ICON_SIZE / 2
+            r = ICON_SIZE * 0.32
+            canvas.create_arc(cx - r, cy - r + 1.5, cx + r, cy + r + 1.5,
+                              start=125, extent=290, style="arc",
+                              outline=color, width=1.6)
+            canvas.create_line(cx, cy - r - 1.5, cx, cy + 1, fill=color, width=1.6)
+
+        draw(COLOR_MAIN)
+
+        def on_enter(_e=None):
+            frame.configure(border_color=COLOR_MAIN, fg_color=COLOR_SECONDARY)
+            canvas.configure(bg=COLOR_SECONDARY)
+            draw("#ffffff")
+
+        def on_leave(_e=None):
+            frame.configure(border_color=COLOR_BORDER, fg_color=IDLE_BG)
+            canvas.configure(bg=IDLE_BG)
+            draw(COLOR_MAIN)
+
+        def on_click(_e=None):
+            play_ui_sound("click")
+            self._panic_kill_all()
+
+        for widget in (frame, canvas):
+            widget.bind("<Enter>", on_enter)
+            widget.bind("<Leave>", on_leave)
+            widget.bind("<Button-1>", on_click)
+
+        return frame
+
+    def _panic_kill_all(self):
+        for key, var, toggle_fn in (
+            ("happ",  self.var_happ,  self.toggle_happ),
+            ("tg",    self.var_tg,    self.toggle_tg),
+            ("warp",  self.var_warp,  self.toggle_warp),
+            ("zprtx", self.var_zprtx, self.toggle_zprtx),
+        ):
+            var.set("off")
+            switch = self.switch_widgets.get(key)
+            if switch is not None:
+                try:
+                    switch.deselect()
+                except Exception:
+                    pass
+            toggle_fn(var)
+        if self.tray_icon is not None:
+            try:
+                self.tray_icon.update_menu()
+            except Exception:
+                pass
 
     def _create_switch(self, parent, text, command, var, info_key, id_key):
         row = ctk.CTkFrame(parent, fg_color="transparent")
@@ -784,8 +1126,6 @@ class ProximityApp(ctk.CTk):
         btn.pack(pady=8, fill="x", padx=30)
         return btn
 
-    #launch
-
     def _launch_happ(self):
         desktop = os.path.join(os.path.expanduser("~"), "Desktop")
         candidates = [
@@ -827,9 +1167,7 @@ class ProximityApp(ctk.CTk):
         elif id_key == "tg":
             webbrowser.open("https://github.com/Flowseal/tg-ws-proxy")
         elif id_key == "zprtx":
-            webbrowser.open("https://github.com/shprttx")
-
-    #tra
+            self._start_zprtx()
 
     def _on_minimize(self, event):
         if event.widget == self and str(self.state()) == "iconic":
@@ -842,12 +1180,53 @@ class ProximityApp(ctk.CTk):
         image = (Image.open(ICON_PATH).convert("RGBA")
                  if os.path.exists(ICON_PATH)
                  else Image.new("RGB", (64, 64), color=COLOR_MAIN))
+        l = LOCALES[self.current_lang]
+
+        def make_tray_toggle(key):
+            return lambda icon, item: self.after(0, lambda: self._tray_toggle_service(key))
+
+        def make_checked(var):
+            return lambda item: var.get() == "on"
+
         menu = pystray.Menu(
-            pystray.MenuItem(LOCALES[self.current_lang]["tray_show"], self._tray_show, default=True),
-            pystray.MenuItem(LOCALES[self.current_lang]["tray_exit"], self._tray_exit),
+            pystray.MenuItem(l["tray_show"], self._tray_show, default=True),
+            pystray.Menu.SEPARATOR,
+            pystray.MenuItem(l["sw_happ"],  make_tray_toggle("happ"),
+                             checked=make_checked(self.var_happ),  radio=False),
+            pystray.MenuItem(l["sw_tg"],    make_tray_toggle("tg"),
+                             checked=make_checked(self.var_tg),    radio=False),
+            pystray.MenuItem(l["sw_zprtx"], make_tray_toggle("zprtx"),
+                             checked=make_checked(self.var_zprtx), radio=False),
+            pystray.MenuItem(l["sw_warp"],  make_tray_toggle("warp"),
+                             checked=make_checked(self.var_warp),  radio=False),
+            pystray.Menu.SEPARATOR,
+            pystray.MenuItem(l["tray_exit"], self._tray_exit),
         )
         self.tray_icon = pystray.Icon("Proximity", image, "Proximity", menu)
         self.tray_icon.run()
+
+    def _tray_toggle_service(self, key):
+        mapping = {
+            "happ":  (self.var_happ,  self.toggle_happ),
+            "tg":    (self.var_tg,    self.toggle_tg),
+            "zprtx": (self.var_zprtx, self.toggle_zprtx),
+            "warp":  (self.var_warp,  self.toggle_warp),
+        }
+        var, toggle_fn = mapping[key]
+        new_state = "off" if var.get() == "on" else "on"
+        var.set(new_state)
+        switch = self.switch_widgets.get(key)
+        if switch is not None:
+            try:
+                switch.select() if new_state == "on" else switch.deselect()
+            except Exception:
+                pass
+        toggle_fn(var)
+        if self.tray_icon is not None:
+            try:
+                self.tray_icon.update_menu()
+            except Exception:
+                pass
 
     def _tray_show(self, icon, item):
         self.tray_icon.stop()
@@ -863,7 +1242,35 @@ class ProximityApp(ctk.CTk):
         self.deiconify()
         self.state("normal")
 
-    #language
+    def _start_single_instance_listener(self, lock_socket):
+        def serve():
+            while True:
+                try:
+                    conn, _ = lock_socket.accept()
+                except OSError:
+                    break
+                try:
+                    conn.recv(16)
+                except Exception:
+                    pass
+                finally:
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
+                self.after(0, self._bring_to_front)
+        threading.Thread(target=serve, daemon=True).start()
+
+    def _bring_to_front(self):
+        if self.tray_icon is not None:
+            try:
+                self.tray_icon.stop()
+            except Exception:
+                pass
+            self.tray_icon = None
+        self._restore_window()
+        self.lift()
+        self.focus_force()
 
     def toggle_language(self):
         self.current_lang = "RU" if self.current_lang == "EN" else "EN"
@@ -884,8 +1291,6 @@ class ProximityApp(ctk.CTk):
         try_cfg(self.btn_inst,                     text=l["btn_pdf"])
         try_cfg(self.btn_about,                    text=l["btn_about"])
 
-    #close / warning
-
     def on_closing(self):
         if "on" in (self.var_happ.get(), self.var_tg.get(),
                     self.var_zprtx.get(), self.var_warp.get()):
@@ -897,12 +1302,11 @@ class ProximityApp(ctk.CTk):
             self._force_close()
 
     def _dismiss_warning(self):
-        """Close the warning dialog without touching toggle/arrow state."""
         for w in self.winfo_children():
             if isinstance(w, ctk.CTkToplevel):
                 w.grab_release()
                 w.destroy()
-       
+
         self._sync_open_buttons()
 
     def _force_close(self):
@@ -913,8 +1317,6 @@ class ProximityApp(ctk.CTk):
         self.bg_canvas.stop_animation()
         self.quit()
 
-    #screens
-
     def show_main_screen(self):
         self._populate_main_screen()
 
@@ -923,7 +1325,6 @@ class ProximityApp(ctk.CTk):
         for w in self.main_container.winfo_children():
             w.destroy()
 
-        # header
         hdr = ctk.CTkFrame(self.main_container, fg_color="#161618", corner_radius=0, height=48)
         hdr.pack(fill="x")
         hdr.pack_propagate(False)
@@ -934,12 +1335,10 @@ class ProximityApp(ctk.CTk):
                      font=(FONT_NAME, 10), text_color="#444455", anchor="e"
                      ).place(relx=1.0, x=-16, rely=0.5, anchor="e")
 
-        # separator
         sep = ctk.CTkCanvas(self.main_container, height=1, bg=COLOR_FRAME, highlightthickness=0)
         sep.pack(fill="x")
         sep.create_line(0, 0, 460, 0, fill=COLOR_MAIN, width=1)
 
-        # body
         body = ctk.CTkFrame(self.main_container, fg_color="transparent", corner_radius=0)
         body.pack(fill="both", expand=True, padx=20, pady=16)
         ctk.CTkLabel(body, text=LOCALES[lang]["installer_label"],
@@ -982,7 +1381,6 @@ class ProximityApp(ctk.CTk):
         make_row(body, LOCALES[lang]["installer_happ"], self._install_happ)
         make_row(body, LOCALES[lang]["installer_warp"], self._install_warp)
 
-        # footer
         footer = ctk.CTkFrame(self.main_container, fg_color="#161618", corner_radius=0, height=44)
         footer.pack(fill="x", side="bottom")
         footer.pack_propagate(False)
@@ -1003,7 +1401,6 @@ class ProximityApp(ctk.CTk):
         for w in self.main_container.winfo_children():
             w.destroy()
 
-        # top accent
         top_line = ctk.CTkCanvas(self.main_container, height=2, bg=COLOR_FRAME, highlightthickness=0)
         top_line.pack(fill="x")
         top_line.create_line(0, 1, 460, 1, fill=COLOR_MAIN, width=2)
@@ -1021,7 +1418,6 @@ class ProximityApp(ctk.CTk):
                                   anchor="nw", wraplength=360)
         text_label.pack(fill="both", expand=True, padx=16, pady=14)
 
-        # typewriter
         chars     = list(text)
         displayed = [""]
         def type_char(i=0):
@@ -1032,7 +1428,6 @@ class ProximityApp(ctk.CTk):
                 self.main_container.after(delay, lambda: type_char(i+1))
         self.main_container.after(120, lambda: type_char(0))
 
-        # back button
         footer = ctk.CTkFrame(self.main_container, fg_color="transparent")
         footer.pack(fill="x", side="bottom", pady=16, padx=20)
 
@@ -1047,8 +1442,6 @@ class ProximityApp(ctk.CTk):
         btn_back.bind("<Enter>", lambda e: btn_back.configure(text_color="#ffffff"))
         btn_back.bind("<Leave>", lambda e: btn_back.configure(text_color=COLOR_MAIN))
         btn_back.pack(fill="x")
-
-    #installe
 
     def open_installer_window(self):
         play_ui_sound("master")
@@ -1068,8 +1461,6 @@ class ProximityApp(ctk.CTk):
 
     def open_about(self):
         webbrowser.open("https://github.com/shprttx/Proximity")
-
-    #toggle handlers
 
     def toggle_happ(self, var):
         if var.get() == "on":
@@ -1103,23 +1494,53 @@ class ProximityApp(ctk.CTk):
             subprocess.run("taskkill /IM TgWsProxy_windows.exe /F",
                            shell=True, creationflags=CREATE_NO_WINDOW)
 
-    def toggle_zprtx(self, var):
+    def _start_zprtx(self):
         z_dir    = os.path.abspath(os.path.join(TOOLS_DIR, "Zprtx"))
-        main_bat = "MAIN.bat"
-        full_bat = os.path.join(z_dir, main_bat)
+        full_bat = os.path.join(z_dir, "MAIN.bat")
+        if not os.path.exists(full_bat):
+            return False
+        try:
+            self._zprtx_proc = subprocess.Popen(
+                ["cmd.exe", "/c", "MAIN.bat"],
+                cwd=z_dir,
+                creationflags=subprocess.CREATE_NEW_CONSOLE,
+            )
+            return True
+        except Exception:
+            self._zprtx_proc = None
+            return False
 
+    def _stop_zprtx(self):
+        for cmd in (
+            "net stop zprtx",
+            "sc delete zprtx",
+            "taskkill /IM winws.exe /F",
+            "net stop WinDivert",
+            "sc delete WinDivert",
+            "net stop WinDivert14",
+            "sc delete WinDivert14",
+        ):
+            try:
+                subprocess.run(cmd, shell=True, creationflags=CREATE_NO_WINDOW,
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except Exception:
+                pass
+
+        if self._zprtx_proc is not None:
+            try:
+                if self._zprtx_proc.poll() is None:
+                    subprocess.run(f"taskkill /PID {self._zprtx_proc.pid} /F",
+                                   shell=True, creationflags=CREATE_NO_WINDOW,
+                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except Exception:
+                pass
+            self._zprtx_proc = None
+
+    def toggle_zprtx(self, var):
         if var.get() == "on":
             self.open_buttons["zprtx"].configure(state="normal", fg_color=COLOR_MAIN,
                                                  border_color=COLOR_MAIN, text_color="#000000")
-            if os.path.exists(full_bat):
-                try:
-                    subprocess.Popen(f'start "" /d "{z_dir}" "{main_bat}"', shell=True)
-                except Exception:
-                    var.set("off")
-                    self.switch_widgets["zprtx"].deselect()
-                    self.open_buttons["zprtx"].configure(state="disabled", fg_color="transparent",
-                                                        border_color="#222230", text_color="#555566")
-            else:
+            if not self._start_zprtx():
                 var.set("off")
                 self.switch_widgets["zprtx"].deselect()
                 self.open_buttons["zprtx"].configure(state="disabled", fg_color="transparent",
@@ -1127,7 +1548,7 @@ class ProximityApp(ctk.CTk):
         else:
             self.open_buttons["zprtx"].configure(state="disabled", fg_color="transparent",
                                                  border_color="#222230", text_color="#555566")
-            
+
             if self.var_warp.get() == "on":
                 self.var_warp.set("off")
                 self.switch_widgets["warp"].deselect()
@@ -1135,11 +1556,7 @@ class ProximityApp(ctk.CTk):
                                                     border_color="#222230", text_color="#555566")
                 subprocess.run('taskkill /IM "Cloudflare WARP.exe" /F',
                                shell=True, creationflags=CREATE_NO_WINDOW)
-            try:
-                subprocess.run("taskkill /IM winws.exe /F", shell=True, creationflags=CREATE_NO_WINDOW)
-                subprocess.run("taskkill /IM cmd.exe /F",   shell=True, creationflags=CREATE_NO_WINDOW)
-            except Exception:
-                pass
+            self._stop_zprtx()
 
     def toggle_warp(self, var):
         if var.get() == "on":
@@ -1160,8 +1577,7 @@ class ProximityApp(ctk.CTk):
             subprocess.run('taskkill /IM "Cloudflare WARP.exe" /F',
                            shell=True, creationflags=CREATE_NO_WINDOW)
 
-#
-
 if __name__ == "__main__":
     app = ProximityApp()
+    app._start_single_instance_listener(_single_instance_lock)
     app.mainloop()
