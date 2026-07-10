@@ -5,12 +5,12 @@
   "notice": {
     "id": "TGINFO",
     "title": {
-      "ru": "Статус работы TG Proxy",
-      "en": "TG Proxy Status"
+      "ru": "Статус работ TG Proxy",
+      "en": "TG Proxy State"
     },
     "text": {
-      "ru": "В связи с временной недоступностью GitHub-профиля автора Flowseal, уведомления об обновлении TG Proxy сейчас приходить не будут. Прокси на данный момент продолжит работать в обычном режиме. Я слежу за ситуацией и обновлю все компоненты в репозитории Proximity, как только его профиль восстановится.",
-      "en": "Due to the temporary unavailability of Flowseal's GitHub profile, TG Proxy update notifications will not arrive for now. The proxy will currently continue to work as usual. I am monitoring the situation and will update all components in the Proximity repository as soon as his profile is restored."
+      "ru": "В связи с временной недоступностью GitHub-профиля автора Flowseal, уведомления об обновлении TG Proxy сейчас приходить не будут. Прокси на данный момент продолжит работать в обычном режиме. Я слежу за ситуацией и обновлю все компоненты в репозитории Proximity, как только его профиль восстановится. Подробнее: https://github.com/shprttx/Proximity/discussions/2",
+      "en": "Due to the temporary unavailability of Flowseal's GitHub profile, TG Proxy update notifications will not arrive for now. The proxy will currently continue to work as usual. I am monitoring the situation and will update all components in the Proximity repository as soon as his profile is restored. More: https://github.com/shprttx/Proximity/discussions/2"
     }
   }
 }
