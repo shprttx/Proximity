@@ -15,7 +15,7 @@
 
 ---
 
-<img src="HP.png" alt="Proximity Banner" width="366" style="border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); border: 1px solid #351c59; display: block; margin: 0 auto;">
+<img src="JJ.png" alt="Proximity Banner" width="366" style="border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); border: 1px solid #351c59; display: block; margin: 0 auto;">
 
 </div>
 
