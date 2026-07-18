@@ -3,14 +3,14 @@
   "release_url": "https://github.com/shprttx/Proximity/releases/tag/10.07.26",
   "download_url": "https://github.com/shprttx/Proximity/releases/download/10.07.26/Proximity.exe",
   "notice": {
-    "id": "TGINF",
+    "id": "TGIN",
     "title": {
       "ru": "Статус работы TG Proxy",
       "en": "TG Proxy Status"
     },
     "text": {
-      "ru": "В связи с временной недоступностью GitHub-профиля автора Flowseal, уведомления об обновлении TG Proxy сейчас приходить не будут. Прокси на данный момент продолжит работать в обычном режиме. Я слежу за ситуацией и обновлю все компоненты в репозитории Proximity, как только его профиль восстановится. Подробнее: https://github.com/shprttx/Proximity/discussions/2",
-      "en": "Due to the temporary unavailability of Flowseal's GitHub profile, TG Proxy update notifications will not arrive for now. The proxy will currently continue to work as usual. I am monitoring the situation and will update all components in the Proximity repository as soon as his profile is restored. More: https://github.com/shprttx/Proximity/discussions/2"
+      "ru": "Профиль Flowseal был разблокирован на GitHub, обновлений пока не было, дальнейшие уведомления TG Proxy будут приходить в штатном режиме.",
+      "en": "The Flowseal profile has been unblocked on GitHub. There have been no updates yet, and future TG Proxy notifications will be received as normal."
     }
   }
 }
