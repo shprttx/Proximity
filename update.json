@@ -1,16 +1,16 @@
 {
-  "version": "10.07.26",
-  "release_url": "https://github.com/shprttx/Proximity/releases/tag/10.07.26",
-  "download_url": "https://github.com/shprttx/Proximity/releases/download/10.07.26/Proximity.exe",
+  "version": "29.07.26",
+  "release_url": "https://github.com/shprttx/Proximity/releases/tag/29.07.26",
+  "download_url": "https://github.com/shprttx/Proximity/releases/download/29.07.26/Proximity.exe",
   "notice": {
     "id": "UPD",
     "title": {
-      "ru": "НОВОСТИ 29.07.2026",
-      "en": "NEWS 29.07.2026"
+      "ru": "",
+      "en": ""
     },
     "text": {
-      "ru": "Обновление будет вечером после 21:00 по мск!",
-      "en": "The update will be released this evening after 9:00 PM Moscow time!"
+      "ru": "",
+      "en": ""
     }
   }
 }
