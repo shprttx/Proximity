@@ -8,6 +8,7 @@ import subprocess
 import webbrowser
 import winsound
 import urllib.request
+import tempfile
 import json
 import socket
 import winreg
@@ -16,12 +17,12 @@ from PIL import Image
 import pystray
 import psutil
 
-#version & urls 
+#version
 
-CURRENT_VERSION = "10.07.26"
+CURRENT_VERSION = "02.08.26"
 UPDATE_URL      = "https://raw.githubusercontent.com/shprttx/Proximity/main/update.json"
 
-#design tokens 
+#design
 
 COLOR_MAIN      = "#00f2ff"
 COLOR_SECONDARY = "#00c8d4"
@@ -34,7 +35,7 @@ FONT_NAME       = "Segoe UI"
 
 PULSE_COLORS = ["#00f2ff", "#1ae5ff", "#33d8ff", "#4dcaff", "#66bdff", "#4dcaff", "#33d8ff", "#1ae5ff"]
 
-#local state (persisted across restarts, e.g. which notice was last seen)
+#local state 
 
 def get_state_dir():
     base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
@@ -83,8 +84,7 @@ AUTOSTART_KEY_PATH = r"Software\Microsoft\Windows\CurrentVersion\Run"
 AUTOSTART_VALUE    = "Proximity"
 
 def _autostart_command():
-    # frozen (PyInstaller .exe) -> just the exe path.
-    # running as a raw .py -> launch through the same interpreter.
+    # frozen 
     if getattr(sys, "frozen", False):
         return f'"{sys.executable}"'
     return f'"{sys.executable}" "{os.path.abspath(sys.argv[0])}"'
@@ -108,11 +108,7 @@ def _ensure_autostart():
 SINGLE_INSTANCE_PORT = 51837
 
 if not ctypes.windll.shell32.IsUserAnAdmin():
-    # Cheap, non-binding check done BEFORE asking for admin rights: if an
-    # instance is already listening on the lock port, just signal it and
-    # exit -- this skips the UAC prompt entirely for repeat launches while
-    # Proximity is already running (the elevated instance is the one that
-    # actually binds/listens, further down, once it's confirmed admin).
+    # Cheap
     try:
         with socket.create_connection(("127.0.0.1", SINGLE_INSTANCE_PORT), timeout=0.3) as c:
             c.sendall(b"SHOW")
@@ -124,11 +120,6 @@ if not ctypes.windll.shell32.IsUserAnAdmin():
     sys.exit()
 
 # single instance guard
-#
-# A loopback-only socket is used purely as a lock: only one process can ever
-# bind it. If binding fails, another copy of Proximity is already running
-# (in the window or minimized in the tray), so instead of opening a second
-# window we ping that instance (it will restore/focus itself) and exit.
 
 def _acquire_single_instance_lock():
     try:
@@ -154,8 +145,7 @@ TOOLS_DIR        = resource_path("Tools")
 CREATE_NO_WINDOW = 0x08000000
 ICON_PATH        = os.path.join(TOOLS_DIR, "Proximity.ico")
 
-# real process names used to detect whether a service is already running
-# (e.g. left over from a previous session) so toggle state can reflect reality
+# real process names 
 SERVICE_PROCESS_NAMES = {
     "happ":  ("happ.exe",),
     "tg":    ("tgwsproxy_windows.exe",),
@@ -226,7 +216,7 @@ LOCALES = {
         "installer_close": "Close Setup Wizard",
         "info_happ":       "Happ VPN is an advanced routing tool.\n\nDevelopers: Flyfrog LLC\n\nPlease read the instructions\n\nbefore installing!",
         "info_tg":         "Telegram Proxy creates a secure WebSocket tunnel.\n\nDeveloper: Flowseal",
-        "info_zprtx":      "ZPRTX is a DPI bypass engine.\n\nDeveloper: shprot\n\nIt modifies packets at the driver level to unblock websites.",
+        "info_zprtx":      "DPI bypass engine.\nModifies packets at the driver level to unblock websites.",
         "info_warp":       "Cloudflare WARP is a utility that combines VPN features with a secure DNS resolver.\n\nIt speeds up website loading and provides access to AI models [Gemini, Claude, GPT, etc.].\n\nDevelopers: Cloudflare, Inc.",
         "warn_title":      "⚠️ WARNING",
         "warn_msg_bold":   "Are you sure you want to close the application?",
@@ -237,18 +227,30 @@ LOCALES = {
         "tray_exit":       "Exit",
         "upd_title":       "UPDATE AVAILABLE",
         "upd_msg":         "A new version of the application is available.\nPlease update to ensure stable performance.\nThe changelog is available on GitHub.",
-        "upd_warn":        "NOTE: The website is temporarily unavailable,\nplease use instant download instead.",
+        "upd_warn":        "After Auto-Update, you may encounter the error\n'Failed to load Python DLL (module not found)'.\nClick OK.\nAfter the error, your app will update\nto the latest version anyway. version.\nThis error will not affect operation.",
         "btn_upd_site":    "Instant Download",
         "btn_upd_gh":      "Changelog",
+        "upd_auto_btn":         "Auto-Update",
+        "upd_auto_win_title":   "UPDATING",
+        "upd_auto_downloading": "Downloading update…",
+        "upd_auto_restarting":  "Installing update, restarting…",
+        "upd_auto_error":       "Auto-update failed. Please use Instant Download instead.",
+        "upd_auto_devmode":     "Auto-Update only works in the compiled .exe version. Please use Instant Download instead.",
         "notice_title_default": "WARNING",
         "notice_close":          "Ok",
+        "launcher_title":    "Choose what to launch",
+        "launcher_question": "What do you want to launch?",
+        "launcher_zprtx_btn":  "ZPRTX",
+        "launcher_zprtx_sub":  "by author shprot",
+        "launcher_zapret_btn": "ZAPRET",
+        "launcher_zapret_sub": "by author Flowseal",
     },
     "RU": {
         "lang_btn":        "EN",
         "header":          "PROXIMITY",
         "sw_happ":         "Happ",
         "sw_tg":           "TG Прокси",
-        "sw_zprtx":        "Ютуб + Дискорд ZPRTX",
+        "sw_zprtx":        "Ютуб + Дискорд",
         "sw_warp":         "Cloudflare WARP",
         "btn_installer":   "МАСТЕР УСТАНОВКИ",
         "btn_pdf":         "Инструкция Happ + Cloudflare WARP",
@@ -260,7 +262,7 @@ LOCALES = {
         "installer_close": "Закрыть Мастер установки",
         "info_happ":       "Happ vpn - это продвинутый инструмент маршрутизации.\n\nРазработчики - Flyfrog LLC\n\nПеред тем как установить\n\nпрочтите инструкцию!\n\nТРЕБУЕТСЯ УСТАНОВКА В Мастер установки!",
         "info_tg":         "Telegram Proxy создает защищенный WebSocket туннель\n\nРазработчик - Flowseal",
-        "info_zprtx":      "ZPRTX - движок обхода DPI.\n\nРазработчик - shprot\n\nМодифицирует пакеты на уровне драйвера для разблокировки сайтов.",
+        "info_zprtx":      "Движок обхода DPI.\nМодифицирует пакеты на уровне драйвера для разблокировки сайтов.",
         "info_warp":       "Cloudflare WARP - утилита объединяющий функции VPN и безопасного DNS-резолвера.\n\nУскоряет загрузку сайтов, дотуп к нейросетям [Gemini, Claude, GPT и др]\n\nРазработчики- Cloudflare, Inc.\n\nТРЕБУЕТСЯ УСТАНОВКА В Мастер установки!",
         "warn_title":      "⚠️ ВНИМАНИЕ",
         "warn_msg_bold":   "Вы уверены, что хотите закрыть приложение?",
@@ -271,11 +273,23 @@ LOCALES = {
         "tray_exit":       "Выход",
         "upd_title":       "ДОСТУПНО ОБНОВЛЕНИЕ",
         "upd_msg":         "Вышло новое обновление приложения.\nПожалуйста, обновитесь для стабильной работы.\nСписок изменений доступен на GitHub.",
-        "upd_warn":        "ВНИМАНИЕ: Сайт временно приостановил свою работу,\nвоспользуйтесь мгновенным скачиванием.",
+        "upd_warn":        "После Автообновления вы можете столкнуться с ошибкой\n'Failed to load Python DLL (не найден модуль)',\nпрожмите ОК,\nпосле ошибки все равно ваше приложение\nобновится до актуальной версии.\nОшибка не повлияет на работу.",
         "btn_upd_site":    "Мгновенное скачивание",
         "btn_upd_gh":      "Список изменений",
+        "upd_auto_btn":         "Автообновление",
+        "upd_auto_win_title":   "ОБНОВЛЕНИЕ",
+        "upd_auto_downloading": "Скачивание обновления…",
+        "upd_auto_restarting":  "Установка обновления, перезапуск…",
+        "upd_auto_error":       "Не удалось обновиться автоматически. Воспользуйтесь Мгновенным скачиванием.",
+        "upd_auto_devmode":     "Автообновление работает только в собранной .exe версии. Воспользуйтесь Мгновенным скачиванием.",
         "notice_title_default": "ВНИМАНИЕ",
         "notice_close":          "Ок",
+        "launcher_title":    "Выбор запуска",
+        "launcher_question": "Что запустить?",
+        "launcher_zprtx_btn":  "ZPRTX",
+        "launcher_zprtx_sub":  "от автор. shprot",
+        "launcher_zapret_btn": "ZAPRET",
+        "launcher_zapret_sub": "от автор. Flowseal",
     },
 }
 
@@ -413,7 +427,7 @@ class UpdateNotificationWindow(ctk.CTkToplevel):
         super().__init__(parent)
         self.title(LOCALES[lang]["upd_title"])
 
-        WIN_W, WIN_H = 380, 300
+        WIN_W, WIN_H = 380, 340
         self.geometry(f"{WIN_W}x{WIN_H}")
         self.configure(fg_color=COLOR_BG)
         self.resizable(False, False)
@@ -449,6 +463,17 @@ class UpdateNotificationWindow(ctk.CTkToplevel):
         ctk.CTkLabel(self._content, text=LOCALES[lang]["upd_warn"],
                      font=(FONT_NAME, 11, "bold"), justify="center", text_color="#ffffff"
                      ).pack(pady=(0, 12))
+
+        btn_auto = ctk.CTkButton(
+            self._content, text=LOCALES[lang]["upd_auto_btn"],
+            fg_color="transparent", border_width=2, border_color=COLOR_MAIN,
+            hover_color="#0b2e35", corner_radius=10, text_color=COLOR_MAIN,
+            font=(FONT_NAME, 12, "bold"), height=34,
+            command=lambda u=download_url: [play_ui_sound("click"), self.destroy(), parent._launch_auto_update(u)]
+        )
+        btn_auto.bind("<Enter>", lambda e: btn_auto.configure(text_color="#ffffff"))
+        btn_auto.bind("<Leave>", lambda e: btn_auto.configure(text_color=COLOR_MAIN))
+        btn_auto.pack(pady=(0, 8), fill="x", padx=30)
 
         btn_site = ctk.CTkButton(
             self._content, text=LOCALES[lang]["btn_upd_site"],
@@ -808,6 +833,209 @@ class CustomWarningWindow(ctk.CTkToplevel):
         )
         btn_no.pack(pady=4, fill="x", padx=30)
 
+class ZprtxLauncherWindow(ctk.CTkToplevel):
+    """Small modal shown whenever the ZPRTX toggle/arrow is used, letting
+    the user pick which DPI-bypass engine console to open: the bundled
+    ZPRTX build (MAIN.bat) or Flowseal's ZAPRET (service.bat)."""
+
+    # red warning-style shimmer -- same phrasing as NoticeWindow's pulse,
+    # just cycled independently per border so the two button outlines
+    # drift out of phase instead of flashing in lockstep
+    _SHIMMER_COLORS = ["#ff0844", "#ff2f5c", "#ff4d74", "#ff2f5c"]
+
+    def __init__(self, parent, lang, callback_zprtx, callback_zapret, callback_cancel=None):
+        super().__init__(parent)
+        self.title(LOCALES[lang]["launcher_title"])
+        WIN_W, WIN_H = 360, 148
+        self.geometry(f"{WIN_W}x{WIN_H}")
+        self.configure(fg_color=COLOR_BG)
+        self.resizable(False, False)
+        self.transient(parent)
+        self.grab_set()
+
+        self.update_idletasks()
+        x = parent.winfo_rootx() + (parent.winfo_width()  - WIN_W) // 2
+        y = parent.winfo_rooty() + (parent.winfo_height() - WIN_H) // 2
+        self.geometry(f"+{x}+{y}")
+
+        if os.path.exists(ICON_PATH):
+            self.after(200, lambda: self.iconbitmap(ICON_PATH))
+
+        self._resolved   = False  # True once a real choice was made (vs. closed with X)
+        self._shimmering = True
+        self.protocol("WM_DELETE_WINDOW", lambda: self._on_close(callback_cancel))
+
+        frame = ctk.CTkFrame(self, fg_color=COLOR_FRAME, corner_radius=16,
+                             border_color=COLOR_ACCENT, border_width=2)
+        frame.pack(fill="both", expand=True, padx=10, pady=10)
+        self._frame_border_step = 0
+        self._frame = frame
+
+        ctk.CTkLabel(frame, text=LOCALES[lang]["launcher_question"],
+                     font=(FONT_NAME, 13, "bold"), text_color=COLOR_ACCENT
+                     ).pack(pady=(14, 10))
+
+        row = ctk.CTkFrame(frame, fg_color="transparent")
+        row.pack(pady=(0, 14))
+
+        self._choice_borders = []
+
+        def _make_choice(main_text, sub_text, callback, phase):
+            wrap = ctk.CTkFrame(row, fg_color="transparent")
+            wrap.pack(side="left", padx=10)
+
+            def _run():
+                self._resolved = True
+                self._shimmering = False
+                self.destroy()
+                if callback:
+                    callback()
+
+            btn = ctk.CTkButton(
+                wrap, text=main_text, width=108,
+                fg_color="transparent", border_width=2, border_color=COLOR_ACCENT,
+                hover_color="#3a0b16", corner_radius=10, text_color=COLOR_ACCENT,
+                font=(FONT_NAME, 13, "bold"), height=34,
+                command=_run
+            )
+            btn.bind("<Enter>", lambda e: btn.configure(text_color="#ffffff"))
+            btn.bind("<Leave>", lambda e: btn.configure(text_color=COLOR_ACCENT))
+            btn.pack()
+            self._choice_borders.append((btn, phase))
+
+            ctk.CTkLabel(wrap, text=sub_text, font=(FONT_NAME, 9),
+                         text_color="#888899").pack(pady=(3, 0))
+
+        _make_choice(LOCALES[lang]["launcher_zprtx_btn"],  LOCALES[lang]["launcher_zprtx_sub"],  callback_zprtx, 0)
+        _make_choice(LOCALES[lang]["launcher_zapret_btn"], LOCALES[lang]["launcher_zapret_sub"], callback_zapret, 2)
+
+        self._shimmer_loop()
+
+    def _shimmer_loop(self):
+        if not self._shimmering or not self.winfo_exists():
+            return
+        n = len(self._SHIMMER_COLORS)
+        self._frame_border_step = (self._frame_border_step + 1) % n
+        try:
+            self._frame.configure(border_color=self._SHIMMER_COLORS[self._frame_border_step])
+            for btn, phase in self._choice_borders:
+                idx = (self._frame_border_step + phase) % n
+                btn.configure(border_color=self._SHIMMER_COLORS[idx])
+        except Exception:
+            pass
+        self.after(160, self._shimmer_loop)
+
+    def _on_close(self, callback_cancel):
+        self._shimmering = False
+        self.destroy()
+        if not self._resolved and callback_cancel:
+            callback_cancel()
+
+class AutoUpdateWindow(ctk.CTkToplevel):
+    """Small modal shown while the app downloads and installs its own
+    update -- progress bar + status line, no close button (the app is
+    about to restart itself, closing mid-way would leave things half done)."""
+
+    def __init__(self, parent, lang):
+        super().__init__(parent)
+        self.title(LOCALES[lang]["upd_auto_win_title"])
+        WIN_W, WIN_H = 360, 190
+        self.geometry(f"{WIN_W}x{WIN_H}")
+        self.configure(fg_color=COLOR_BG)
+        self.resizable(False, False)
+        self.transient(parent)
+        self.grab_set()
+        self.protocol("WM_DELETE_WINDOW", lambda: None)
+
+        self.update_idletasks()
+        x = parent.winfo_rootx() + (parent.winfo_width()  - WIN_W) // 2
+        y = parent.winfo_rooty() + (parent.winfo_height() - WIN_H) // 2
+        self.geometry(f"+{x}+{y}")
+
+        if os.path.exists(ICON_PATH):
+            self.after(200, lambda: self.iconbitmap(ICON_PATH))
+
+        frame = ctk.CTkFrame(self, fg_color=COLOR_FRAME, corner_radius=16,
+                             border_color=COLOR_MAIN, border_width=2)
+        frame.pack(fill="both", expand=True, padx=12, pady=12)
+
+        ctk.CTkLabel(frame, text=LOCALES[lang]["upd_auto_win_title"],
+                     font=(FONT_NAME, 15, "bold"), text_color=COLOR_MAIN
+                     ).pack(pady=(18, 10))
+
+        self._status_label = ctk.CTkLabel(
+            frame, text=LOCALES[lang]["upd_auto_downloading"],
+            font=(FONT_NAME, 12), text_color="#cccccc")
+        self._status_label.pack(pady=(0, 14))
+
+        self._bar = ctk.CTkProgressBar(frame, progress_color=COLOR_MAIN,
+                                       fg_color="#12121e", height=14, corner_radius=7)
+        self._bar.set(0.0)
+        self._bar.pack(fill="x", padx=30)
+
+        self._pct_label = ctk.CTkLabel(frame, text="0%",
+                     font=(FONT_NAME, 11, "bold"), text_color=COLOR_MAIN)
+        self._pct_label.pack(pady=(8, 0))
+
+    def set_progress(self, fraction):
+        try:
+            fraction = max(0.0, min(1.0, fraction))
+            self._bar.set(fraction)
+            self._pct_label.configure(text=f"{int(fraction * 100)}%")
+        except Exception:
+            pass
+
+    def set_status(self, text):
+        try:
+            self._status_label.configure(text=text)
+        except Exception:
+            pass
+
+class SimpleInfoWindow(ctk.CTkToplevel):
+    """Small single-button popup for short status/error messages (e.g.
+    auto-update outcomes) -- same visual language as CustomWarningWindow,
+    just with one dismiss button instead of yes/no."""
+
+    def __init__(self, parent, lang, title, message, accent=COLOR_MAIN):
+        super().__init__(parent)
+        self.title(title)
+        WIN_W, WIN_H = 380, 210
+        self.geometry(f"{WIN_W}x{WIN_H}")
+        self.configure(fg_color=COLOR_BG)
+        self.resizable(False, False)
+        self.transient(parent)
+        self.grab_set()
+
+        self.update_idletasks()
+        x = parent.winfo_rootx() + (parent.winfo_width()  - WIN_W) // 2
+        y = parent.winfo_rooty() + (parent.winfo_height() - WIN_H) // 2
+        self.geometry(f"+{x}+{y}")
+
+        if os.path.exists(ICON_PATH):
+            self.after(200, lambda: self.iconbitmap(ICON_PATH))
+
+        frame = ctk.CTkFrame(self, fg_color=COLOR_FRAME, corner_radius=16,
+                             border_color=accent, border_width=2)
+        frame.pack(fill="both", expand=True, padx=12, pady=12)
+
+        ctk.CTkLabel(frame, text=title, font=(FONT_NAME, 14, "bold"),
+                     text_color=accent, wraplength=320, justify="center"
+                     ).pack(pady=(18, 6), padx=16)
+
+        ctk.CTkLabel(frame, text=message, font=(FONT_NAME, 11), justify="center",
+                     text_color="#cccccc", wraplength=320).pack(pady=(0, 16), padx=16)
+
+        btn_ok = ctk.CTkButton(
+            frame, text=LOCALES[lang]["notice_close"],
+            fg_color="transparent", border_width=2, border_color=accent,
+            hover_color="#0b2e35", corner_radius=10, text_color=accent,
+            font=(FONT_NAME, 11, "bold"), height=32,
+            command=self.destroy
+        )
+        btn_ok.bind("<Enter>", lambda e: btn_ok.configure(text_color="#ffffff"))
+        btn_ok.bind("<Leave>", lambda e: btn_ok.configure(text_color=accent))
+        btn_ok.pack(pady=4, fill="x", padx=30, side="bottom")
+
 #main
 
 class ProximityApp(ctk.CTk):
@@ -847,8 +1075,10 @@ class ProximityApp(ctk.CTk):
         self.tray_icon      = None
         self.update_data    = None
         self.pending_notice = None
+        self._auto_update_win = None
         self._popup_shown   = False   # guards against showing update/notice popup twice
         self._zprtx_proc    = None   # Popen handle of the MAIN.bat console window, for cleanup
+        self._zapret_proc   = None   # Popen handle of the ZAPRET service.bat console window, for cleanup
         self._panic_running = False  # guards against overlapping panic-button sequences
 
         self._check_for_updates()
@@ -907,6 +1137,155 @@ class ProximityApp(ctk.CTk):
         state["last_seen_notice_id"] = notice.get("id")
         save_local_state(state)
         self.pending_notice = None
+
+    #auto-update
+
+    def _launch_auto_update(self, download_url):
+        """Entry point for the 'Auto-Update' button. Only makes sense for
+        the compiled .exe (a running .py can't sensibly replace itself the
+        same way) -- in dev mode we just point the person at manual download."""
+        if not getattr(sys, "frozen", False):
+            SimpleInfoWindow(self, self.current_lang,
+                             LOCALES[self.current_lang]["upd_auto_win_title"],
+                             LOCALES[self.current_lang]["upd_auto_devmode"],
+                             accent=COLOR_ACCENT)
+            return
+
+        self._auto_update_win = AutoUpdateWindow(self, self.current_lang)
+        threading.Thread(target=self._auto_update_worker, args=(download_url,), daemon=True).start()
+
+    def _auto_update_worker(self, download_url):
+        """Runs off the UI thread: downloads the new .exe into a temp folder
+        with progress reporting, then hands off to a tiny batch script that
+        waits for this process to exit, swaps the exe, and restarts it."""
+        try:
+            temp_dir = os.path.join(os.environ.get("TEMP") or tempfile.gettempdir(), "Proximity_update")
+            os.makedirs(temp_dir, exist_ok=True)
+            new_exe_path = os.path.join(temp_dir, "Proximity_new.exe")
+
+            req = urllib.request.Request(download_url, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                total = int(resp.headers.get("Content-Length", 0) or 0)
+                downloaded = 0
+                chunk_size = 262144
+                with open(new_exe_path, "wb") as f:
+                    while True:
+                        chunk = resp.read(chunk_size)
+                        if not chunk:
+                            break
+                        f.write(chunk)
+                        downloaded += len(chunk)
+                        if total > 0:
+                            pct = downloaded / total
+                            self.after(0, lambda p=pct: self._auto_update_progress(p))
+
+            # sanity check -- a corrupted/partial/HTML-error-page download
+            # should never be allowed to overwrite the working exe
+            if not os.path.exists(new_exe_path) or os.path.getsize(new_exe_path) < 1_000_000:
+                raise RuntimeError("downloaded file looks invalid")
+
+            # files written by urllib still pick up the NTFS "downloaded
+            # from the internet" zone-identifier the same as a browser
+            # download would. Windows then runs a blocking SmartScreen/
+            # Defender check on first launch, which races with the
+            # PyInstaller bootloader's own self-extraction and is what
+            # causes the intermittent "Failed to load Python DLL" error
+            # right after an update -- stripping it here (same effect as
+            # Unblock-File) avoids that race entirely instead of just
+            # papering over it with a delay
+            try:
+                os.remove(new_exe_path + ":Zone.Identifier")
+            except OSError:
+                pass
+
+            lang = self.current_lang
+            self.after(0, lambda: self._auto_update_status(LOCALES[lang]["upd_auto_restarting"]))
+            self.after(400, lambda: self._finish_auto_update(new_exe_path))
+        except Exception:
+            self.after(0, self._auto_update_failed)
+
+    def _auto_update_progress(self, fraction):
+        if self._auto_update_win is not None:
+            self._auto_update_win.set_progress(fraction)
+
+    def _auto_update_status(self, text):
+        if self._auto_update_win is not None:
+            self._auto_update_win.set_status(text)
+
+    def _finish_auto_update(self, new_exe_path):
+        """Writes and launches the small updater .bat, then exits this
+        process. The .bat waits for our PID to disappear (can't happen
+        while we're still writing this line, only after self.quit()
+        further down), retries the move in case Windows/AV still has the
+        new file open for a moment, then restarts the exe and deletes
+        itself -- nothing is left behind."""
+        current_exe = os.path.abspath(sys.executable)
+        pid = os.getpid()
+        temp_dir = os.path.dirname(new_exe_path)
+        bat_path = os.path.join(temp_dir, "apply_update.bat")
+
+        bat_contents = (
+            "@echo off\r\n"
+            ":wait_loop\r\n"
+            f'tasklist /FI "PID eq {pid}" 2>NUL | find "{pid}" >NUL\r\n'
+            "if not errorlevel 1 (\r\n"
+            "    timeout /t 1 /nobreak >NUL\r\n"
+            "    goto wait_loop\r\n"
+            ")\r\n"
+            "\r\n"
+            "for /l %%i in (1,1,15) do (\r\n"
+            f'    move /Y "{new_exe_path}" "{current_exe}" >NUL 2>&1\r\n'
+            "    if not errorlevel 1 goto done\r\n"
+            "    timeout /t 1 /nobreak >NUL\r\n"
+            ")\r\n"
+            "\r\n"
+            ":done\r\n"
+            # small settle delay as a secondary safety net (in case AV
+            # still briefly touches the file right after the move) --
+            # the main fix is stripping the zone-identifier before we
+            # ever get here, see _auto_update_worker
+            "timeout /t 2 /nobreak >NUL\r\n"
+            f'start "" "{current_exe}"\r\n'
+            'del "%~f0"\r\n'
+        )
+
+        try:
+            with open(bat_path, "w", encoding="utf-8") as f:
+                f.write(bat_contents)
+            subprocess.Popen(["cmd.exe", "/c", bat_path], cwd=temp_dir,
+                             creationflags=subprocess.CREATE_NO_WINDOW)
+        except Exception:
+            self._auto_update_failed()
+            return
+
+        self._auto_update_exit_now()
+
+    def _auto_update_exit_now(self):
+        """Same shutdown a normal window-close performs (stop any running
+        services) before quitting, so the freshly-restarted exe starts
+        from a clean state instead of an orphaned bypass process."""
+        if self.var_happ.get()  == "on": self.toggle_happ (ctk.StringVar(value="off"))
+        if self.var_tg.get()    == "on": self.toggle_tg   (ctk.StringVar(value="off"))
+        if self.var_zprtx.get() == "on": self.toggle_zprtx(ctk.StringVar(value="off"))
+        if self.var_warp.get()  == "on": self.toggle_warp (ctk.StringVar(value="off"))
+        try:
+            self.bg_canvas.stop_animation()
+        except Exception:
+            pass
+        self.quit()
+
+    def _auto_update_failed(self):
+        if self._auto_update_win is not None:
+            try:
+                self._auto_update_win.destroy()
+            except Exception:
+                pass
+            self._auto_update_win = None
+        play_ui_sound("warning")
+        SimpleInfoWindow(self, self.current_lang,
+                         LOCALES[self.current_lang]["upd_auto_win_title"],
+                         LOCALES[self.current_lang]["upd_auto_error"],
+                         accent=COLOR_ACCENT)
 
     #splash
 
@@ -1385,7 +1764,7 @@ class ProximityApp(ctk.CTk):
         elif id_key == "tg":
             webbrowser.open("https://github.com/Flowseal/tg-ws-proxy")
         elif id_key == "zprtx":
-            self._start_zprtx()
+            self._open_zprtx_launcher()
 
     #tra
 
@@ -1765,6 +2144,25 @@ class ProximityApp(ctk.CTk):
             self._zprtx_proc = None
             return False
 
+    def _start_zapret(self):
+        """Launch Flowseal's ZAPRET console (service.bat) the same way
+        _start_zprtx launches MAIN.bat -- its own console window, own PID,
+        kept on hand for cleanup."""
+        z_dir    = os.path.abspath(os.path.join(TOOLS_DIR, "zapret_1.10.0"))
+        full_bat = os.path.join(z_dir, "service.bat")
+        if not os.path.exists(full_bat):
+            return False
+        try:
+            self._zapret_proc = subprocess.Popen(
+                ["cmd.exe", "/c", "service.bat"],
+                cwd=z_dir,
+                creationflags=subprocess.CREATE_NEW_CONSOLE,
+            )
+            return True
+        except Exception:
+            self._zapret_proc = None
+            return False
+
     def _stop_zprtx(self):
         """Stop ZPRTX the same way MAIN.bat's own 'Выключить' menu option
         does. ZPRTX installs itself as a real Windows service ('sc create
@@ -1772,10 +2170,16 @@ class ProximityApp(ctk.CTk):
         services -- none of that is a child process of the console window,
         so killing the console (or, worse, every cmd.exe on the machine)
         never actually stopped the bypass engine; only mirroring the bat's
-        own stop sequence does."""
+        own stop sequence does.
+
+        Both ZPRTX and ZAPRET are built on the same winws.exe bypass
+        binary, so the same cleanup sweep (plus the ZAPRET service name)
+        covers whichever one the user launched from the picker."""
         for cmd in (
             "net stop zprtx",
             "sc delete zprtx",
+            "net stop zapret",
+            "sc delete zapret",
             "taskkill /IM winws.exe /F",
             "net stop WinDivert",
             "sc delete WinDivert",
@@ -1788,27 +2192,55 @@ class ProximityApp(ctk.CTk):
             except Exception:
                 pass
 
-        # close only the specific MAIN.bat console window we opened (by its
-        # own PID) if it's still open -- never a blanket cmd.exe sweep
-        if self._zprtx_proc is not None:
-            try:
-                if self._zprtx_proc.poll() is None:
-                    subprocess.run(f"taskkill /PID {self._zprtx_proc.pid} /F",
-                                   shell=True, creationflags=CREATE_NO_WINDOW,
-                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            except Exception:
-                pass
-            self._zprtx_proc = None
+        # close only the specific MAIN.bat / service.bat console windows we
+        # opened (by their own PIDs) if still open -- never a blanket cmd.exe sweep
+        for attr in ("_zprtx_proc", "_zapret_proc"):
+            proc = getattr(self, attr, None)
+            if proc is not None:
+                try:
+                    if proc.poll() is None:
+                        subprocess.run(f"taskkill /PID {proc.pid} /F",
+                                       shell=True, creationflags=CREATE_NO_WINDOW,
+                                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                except Exception:
+                    pass
+                setattr(self, attr, None)
+
+    def _zprtx_revert_off(self):
+        """Flips the ZPRTX switch/button back to the 'off' look -- used
+        when the launcher picker is cancelled, or the chosen engine
+        failed to start."""
+        self.var_zprtx.set("off")
+        self.switch_widgets["zprtx"].deselect()
+        self.open_buttons["zprtx"].configure(state="disabled", fg_color="transparent",
+                                             border_color="#222230", text_color="#555566")
+
+    def _open_zprtx_launcher(self, on_result=None, on_cancel=None):
+        """Shows the ZPRTX-vs-ZAPRET picker. on_result(bool) is called with
+        whether the chosen engine actually started; on_cancel() is called
+        if the picker is dismissed (X button) without a choice."""
+        def choose_zprtx():
+            ok = self._start_zprtx()
+            if on_result:
+                on_result(ok)
+
+        def choose_zapret():
+            ok = self._start_zapret()
+            if on_result:
+                on_result(ok)
+
+        ZprtxLauncherWindow(self, self.current_lang, choose_zprtx, choose_zapret, on_cancel)
 
     def toggle_zprtx(self, var):
         if var.get() == "on":
             self.open_buttons["zprtx"].configure(state="normal", fg_color=COLOR_MAIN,
                                                  border_color=COLOR_MAIN, text_color="#000000")
-            if not self._start_zprtx():
-                var.set("off")
-                self.switch_widgets["zprtx"].deselect()
-                self.open_buttons["zprtx"].configure(state="disabled", fg_color="transparent",
-                                                     border_color="#222230", text_color="#555566")
+
+            def on_result(ok):
+                if not ok:
+                    self._zprtx_revert_off()
+
+            self._open_zprtx_launcher(on_result=on_result, on_cancel=self._zprtx_revert_off)
         else:
             self.open_buttons["zprtx"].configure(state="disabled", fg_color="transparent",
                                                  border_color="#222230", text_color="#555566")
