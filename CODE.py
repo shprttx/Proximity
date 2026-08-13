@@ -12,6 +12,7 @@ import tempfile
 import json
 import socket
 import winreg
+import hashlib
 import customtkinter as ctk
 from PIL import Image
 import pystray
@@ -19,7 +20,7 @@ import psutil
 
 #version
 
-CURRENT_VERSION = "02.08.26"
+CURRENT_VERSION = "13.08.26"
 UPDATE_URL      = "https://raw.githubusercontent.com/shprttx/Proximity/main/update.json"
 
 #design
@@ -90,17 +91,19 @@ def _autostart_command():
     return f'"{sys.executable}" "{os.path.abspath(sys.argv[0])}"'
 
 def _ensure_autostart():
-    """Registers Proximity in the classic HKCU Run key so it launches at
-    Windows logon. This is deliberately the plain registry key (not a
-    scheduled task) so it shows up in Task Manager's Startup tab, where
-    the user can switch it off themselves without touching the app.
-    Re-elevation on logon still goes through the normal admin check at
-    the top of this file -- this only adds the entry, it doesn't grant
-    or bypass anything."""
     try:
         key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, AUTOSTART_KEY_PATH,
                              0, winreg.KEY_SET_VALUE)
         winreg.SetValueEx(key, AUTOSTART_VALUE, 0, winreg.REG_SZ, _autostart_command())
+        winreg.CloseKey(key)
+    except Exception:
+        pass
+
+def _remove_autostart():
+    try:
+        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, AUTOSTART_KEY_PATH,
+                             0, winreg.KEY_SET_VALUE)
+        winreg.DeleteValue(key, AUTOSTART_VALUE)
         winreg.CloseKey(key)
     except Exception:
         pass
@@ -114,12 +117,12 @@ if not ctypes.windll.shell32.IsUserAnAdmin():
             c.sendall(b"SHOW")
         sys.exit()
     except OSError:
-        pass  # nothing listening yet -- this really is the first launch
+        pass  # 
 
     ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
     sys.exit()
 
-# single instance guard
+# single 
 
 def _acquire_single_instance_lock():
     try:
@@ -139,7 +142,8 @@ _single_instance_lock = _acquire_single_instance_lock()
 if _single_instance_lock is None:
     sys.exit()
 
-_ensure_autostart()
+if load_local_state().get("autostart", True):
+    _ensure_autostart()
 
 TOOLS_DIR        = resource_path("Tools")
 CREATE_NO_WINDOW = 0x08000000
@@ -166,9 +170,6 @@ def color_fade(c1, c2, steps):
     ]
 
 def get_running_service_keys():
-    """Scan real OS processes and return the set of service keys
-    (happ / tg / zprtx / warp) that are actually running right now.
-    Used at startup so toggles reflect reality instead of assuming 'off'."""
     running_names = set()
     for proc in psutil.process_iter(["name"]):
         try:
@@ -196,7 +197,7 @@ def play_ui_sound(sound_type):
     if os.path.exists(path):
         threading.Thread(target=winsound.PlaySound, args=(path, winsound.SND_FILENAME), daemon=True).start()
 
-#locales
+#loc
 
 LOCALES = {
     "EN": {
@@ -224,6 +225,7 @@ LOCALES = {
         "btn_yes":         "Yes",
         "btn_no":          "No",
         "tray_show":       "Open",
+        "tray_panic":      "Turn all OFF",
         "tray_exit":       "Exit",
         "upd_title":       "UPDATE AVAILABLE",
         "upd_msg":         "A new version of the application is available.\nPlease update to ensure stable performance.\nThe changelog is available on GitHub.",
@@ -244,6 +246,11 @@ LOCALES = {
         "launcher_zprtx_sub":  "by author shprot",
         "launcher_zapret_btn": "ZAPRET",
         "launcher_zapret_sub": "by author Flowseal",
+        "settings_title":            "SETTINGS",
+        "settings_close":            "Close",
+        "settings_autostart":        "Launch on Windows startup",
+        "settings_start_minimized":  "Start minimized to tray",
+        "settings_confirm_close":    "Warn before closing active services",
     },
     "RU": {
         "lang_btn":        "EN",
@@ -270,6 +277,7 @@ LOCALES = {
         "btn_yes":         "Да",
         "btn_no":          " Нет",
         "tray_show":       "Открыть",
+        "tray_panic":      "Выключить всё",
         "tray_exit":       "Выход",
         "upd_title":       "ДОСТУПНО ОБНОВЛЕНИЕ",
         "upd_msg":         "Вышло новое обновление приложения.\nПожалуйста, обновитесь для стабильной работы.\nСписок изменений доступен на GitHub.",
@@ -290,6 +298,11 @@ LOCALES = {
         "launcher_zprtx_sub":  "от автор. shprot",
         "launcher_zapret_btn": "ZAPRET",
         "launcher_zapret_sub": "от автор. Flowseal",
+        "settings_title":            "НАСТРОЙКИ",
+        "settings_close":            "Закрыть",
+        "settings_autostart":        "Запуск вместе с Windows",
+        "settings_start_minimized":  "Запускать свёрнутым в трей",
+        "settings_confirm_close":    "Предупреждать при закрытии с активными сервисами",
     },
 }
 
@@ -345,8 +358,7 @@ class BubbleBackground(ctk.CTkCanvas):
             b["y"] -= b["speed"]
             b["x"] += math.sin(b["y"] / 40.0 + b["swing_offset"]) * 0.25
 
-            # shockwave displacement left over from a panic-button hit,
-            # decays back to zero over ~15-20 frames
+            # shockwave 
             if b["push_x"] or b["push_y"]:
                 b["x"] += b["push_x"]
                 b["y"] += b["push_y"]
@@ -445,6 +457,7 @@ class UpdateNotificationWindow(ctk.CTkToplevel):
 
         release_url  = update_data.get("release_url",  "https://github.com/shprttx/Proximity/releases")
         download_url = update_data.get("download_url", release_url)
+        expected_sha256 = update_data.get("sha256", "")
 
         self._canvas = ctk.CTkCanvas(self, bg=COLOR_BG, highlightthickness=0, width=WIN_W, height=WIN_H)
         self._canvas.place(x=0, y=0, relwidth=1, relheight=1)
@@ -469,7 +482,7 @@ class UpdateNotificationWindow(ctk.CTkToplevel):
             fg_color="transparent", border_width=2, border_color=COLOR_MAIN,
             hover_color="#0b2e35", corner_radius=10, text_color=COLOR_MAIN,
             font=(FONT_NAME, 12, "bold"), height=34,
-            command=lambda u=download_url: [play_ui_sound("click"), self.destroy(), parent._launch_auto_update(u)]
+            command=lambda u=download_url, h=expected_sha256: [play_ui_sound("click"), self.destroy(), parent._launch_auto_update(u, h)]
         )
         btn_auto.bind("<Enter>", lambda e: btn_auto.configure(text_color="#ffffff"))
         btn_auto.bind("<Leave>", lambda e: btn_auto.configure(text_color=COLOR_MAIN))
@@ -608,16 +621,9 @@ class UpdateNotificationWindow(ctk.CTkToplevel):
         except Exception:
             return False
 
-#notice (data-driven via update.json, deliberately NOT styled like the update popup)
+#notice 
 
 class NoticeWindow(ctk.CTkToplevel):
-    """One-off notice popup whose title/text come entirely from update.json's
-    'notice' field. Uses the same intro-animation *language* as
-    UpdateNotificationWindow (grow line -> pulse a big glyph -> fade into
-    content) but roughly twice as fast and with a '!' mark instead of the
-    word UPDATE, and COLOR_ACCENT instead of COLOR_MAIN, so it reads as
-    related but clearly distinct from the update dialog."""
-
     def __init__(self, parent, lang, notice_data, on_dismiss=None, on_close_show_next=None):
         super().__init__(parent)
         self._on_dismiss         = on_dismiss
@@ -673,7 +679,7 @@ class NoticeWindow(ctk.CTkToplevel):
         self._pulsing      = False
         self.after(80, self._fade_in)
 
-    #animation (~2x faster than UpdateNotificationWindow's intro)
+    #animation 
 
     def _fade_in(self, alpha=0.0):
         alpha = min(alpha + 0.14, 1.0)
@@ -834,13 +840,7 @@ class CustomWarningWindow(ctk.CTkToplevel):
         btn_no.pack(pady=4, fill="x", padx=30)
 
 class ZprtxLauncherWindow(ctk.CTkToplevel):
-    """Small modal shown whenever the ZPRTX toggle/arrow is used, letting
-    the user pick which DPI-bypass engine console to open: the bundled
-    ZPRTX build (MAIN.bat) or Flowseal's ZAPRET (service.bat)."""
-
-    # red warning-style shimmer -- same phrasing as NoticeWindow's pulse,
-    # just cycled independently per border so the two button outlines
-    # drift out of phase instead of flashing in lockstep
+    # red warning
     _SHIMMER_COLORS = ["#ff0844", "#ff2f5c", "#ff4d74", "#ff2f5c"]
 
     def __init__(self, parent, lang, callback_zprtx, callback_zapret, callback_cancel=None):
@@ -861,7 +861,7 @@ class ZprtxLauncherWindow(ctk.CTkToplevel):
         if os.path.exists(ICON_PATH):
             self.after(200, lambda: self.iconbitmap(ICON_PATH))
 
-        self._resolved   = False  # True once a real choice was made (vs. closed with X)
+        self._resolved   = False  # True 
         self._shimmering = True
         self.protocol("WM_DELETE_WINDOW", lambda: self._on_close(callback_cancel))
 
@@ -932,10 +932,6 @@ class ZprtxLauncherWindow(ctk.CTkToplevel):
             callback_cancel()
 
 class AutoUpdateWindow(ctk.CTkToplevel):
-    """Small modal shown while the app downloads and installs its own
-    update -- progress bar + status line, no close button (the app is
-    about to restart itself, closing mid-way would leave things half done)."""
-
     def __init__(self, parent, lang):
         super().__init__(parent)
         self.title(LOCALES[lang]["upd_auto_win_title"])
@@ -992,10 +988,6 @@ class AutoUpdateWindow(ctk.CTkToplevel):
             pass
 
 class SimpleInfoWindow(ctk.CTkToplevel):
-    """Small single-button popup for short status/error messages (e.g.
-    auto-update outcomes) -- same visual language as CustomWarningWindow,
-    just with one dismiss button instead of yes/no."""
-
     def __init__(self, parent, lang, title, message, accent=COLOR_MAIN):
         super().__init__(parent)
         self.title(title)
@@ -1057,8 +1049,7 @@ class ProximityApp(ctk.CTk):
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
         self.bind("<Unmap>", self._on_minimize)
 
-        # detect services that are already running from a previous session,
-        # so toggles reflect the real system state instead of assuming everything is off
+        # detect services
         try:
             already_running = get_running_service_keys()
         except Exception:
@@ -1076,10 +1067,21 @@ class ProximityApp(ctk.CTk):
         self.update_data    = None
         self.pending_notice = None
         self._auto_update_win = None
-        self._popup_shown   = False   # guards against showing update/notice popup twice
-        self._zprtx_proc    = None   # Popen handle of the MAIN.bat console window, for cleanup
-        self._zapret_proc   = None   # Popen handle of the ZAPRET service.bat console window, for cleanup
-        self._panic_running = False  # guards against overlapping panic-button sequences
+        self._popup_shown   = False   # guards 
+        self._zprtx_proc    = None   # Popen handle 
+        self._zapret_proc   = None   # Popen handle 
+        self._panic_running = False  # guards 
+
+        # settings (persisted in state.json alongside the notice dedup id)
+        _state = load_local_state()
+        self.settings = {
+            "autostart":       _state.get("autostart", True),
+            "start_minimized": _state.get("start_minimized", False),
+            "confirm_close":   _state.get("confirm_close", True),
+        }
+        self.var_autostart      = ctk.StringVar(value="on" if self.settings["autostart"]       else "off")
+        self.var_start_min      = ctk.StringVar(value="on" if self.settings["start_minimized"] else "off")
+        self.var_confirm_close  = ctk.StringVar(value="on" if self.settings["confirm_close"]   else "off")
 
         self._check_for_updates()
 
@@ -1106,8 +1108,7 @@ class ProximityApp(ctk.CTk):
             except Exception:
                 pass
             finally:
-                # the fetch can finish before OR after the splash animation --
-                # whichever happens later is the one that actually shows the popup
+                # the fetch 
                 self.after(0, self._maybe_show_startup_popup)
         threading.Thread(target=fetch, daemon=True).start()
 
@@ -1115,7 +1116,7 @@ class ProximityApp(ctk.CTk):
         if self._popup_shown:
             return
         if not self.winfo_viewable():
-            return  # splash still on screen / main window not shown yet -- fade-in will retry
+            return  # splash 
         if self.pending_notice:
             self._popup_shown = True
             NoticeWindow(self, self.current_lang, self.pending_notice,
@@ -1140,10 +1141,7 @@ class ProximityApp(ctk.CTk):
 
     #auto-update
 
-    def _launch_auto_update(self, download_url):
-        """Entry point for the 'Auto-Update' button. Only makes sense for
-        the compiled .exe (a running .py can't sensibly replace itself the
-        same way) -- in dev mode we just point the person at manual download."""
+    def _launch_auto_update(self, download_url, expected_sha256=""):
         if not getattr(sys, "frozen", False):
             SimpleInfoWindow(self, self.current_lang,
                              LOCALES[self.current_lang]["upd_auto_win_title"],
@@ -1152,12 +1150,10 @@ class ProximityApp(ctk.CTk):
             return
 
         self._auto_update_win = AutoUpdateWindow(self, self.current_lang)
-        threading.Thread(target=self._auto_update_worker, args=(download_url,), daemon=True).start()
+        threading.Thread(target=self._auto_update_worker,
+                         args=(download_url, expected_sha256), daemon=True).start()
 
-    def _auto_update_worker(self, download_url):
-        """Runs off the UI thread: downloads the new .exe into a temp folder
-        with progress reporting, then hands off to a tiny batch script that
-        waits for this process to exit, swaps the exe, and restarts it."""
+    def _auto_update_worker(self, download_url, expected_sha256=""):
         try:
             temp_dir = os.path.join(os.environ.get("TEMP") or tempfile.gettempdir(), "Proximity_update")
             os.makedirs(temp_dir, exist_ok=True)
@@ -1179,20 +1175,24 @@ class ProximityApp(ctk.CTk):
                             pct = downloaded / total
                             self.after(0, lambda p=pct: self._auto_update_progress(p))
 
-            # sanity check -- a corrupted/partial/HTML-error-page download
-            # should never be allowed to overwrite the working exe
+            # sanity check 
             if not os.path.exists(new_exe_path) or os.path.getsize(new_exe_path) < 1_000_000:
                 raise RuntimeError("downloaded file looks invalid")
 
-            # files written by urllib still pick up the NTFS "downloaded
-            # from the internet" zone-identifier the same as a browser
-            # download would. Windows then runs a blocking SmartScreen/
-            # Defender check on first launch, which races with the
-            # PyInstaller bootloader's own self-extraction and is what
-            # causes the intermittent "Failed to load Python DLL" error
-            # right after an update -- stripping it here (same effect as
-            # Unblock-File) avoids that race entirely instead of just
-            # papering over it with a delay
+            # integrity check 
+            expected = (expected_sha256 or "").strip().lower()
+            digest = hashlib.sha256()
+            with open(new_exe_path, "rb") as f:
+                for chunk in iter(lambda: f.read(1048576), b""):
+                    digest.update(chunk)
+            if not expected or digest.hexdigest().lower() != expected:
+                try:
+                    os.remove(new_exe_path)
+                except OSError:
+                    pass
+                raise RuntimeError("sha256 mismatch or missing -- refusing to install")
+
+            # files
             try:
                 os.remove(new_exe_path + ":Zone.Identifier")
             except OSError:
@@ -1213,12 +1213,6 @@ class ProximityApp(ctk.CTk):
             self._auto_update_win.set_status(text)
 
     def _finish_auto_update(self, new_exe_path):
-        """Writes and launches the small updater .bat, then exits this
-        process. The .bat waits for our PID to disappear (can't happen
-        while we're still writing this line, only after self.quit()
-        further down), retries the move in case Windows/AV still has the
-        new file open for a moment, then restarts the exe and deletes
-        itself -- nothing is left behind."""
         current_exe = os.path.abspath(sys.executable)
         pid = os.getpid()
         temp_dir = os.path.dirname(new_exe_path)
@@ -1240,10 +1234,7 @@ class ProximityApp(ctk.CTk):
             ")\r\n"
             "\r\n"
             ":done\r\n"
-            # small settle delay as a secondary safety net (in case AV
-            # still briefly touches the file right after the move) --
-            # the main fix is stripping the zone-identifier before we
-            # ever get here, see _auto_update_worker
+            # small
             "timeout /t 2 /nobreak >NUL\r\n"
             f'start "" "{current_exe}"\r\n'
             'del "%~f0"\r\n'
@@ -1261,9 +1252,6 @@ class ProximityApp(ctk.CTk):
         self._auto_update_exit_now()
 
     def _auto_update_exit_now(self):
-        """Same shutdown a normal window-close performs (stop any running
-        services) before quitting, so the freshly-restarted exe starts
-        from a clean state instead of an orphaned bypass process."""
         if self.var_happ.get()  == "on": self.toggle_happ (ctk.StringVar(value="off"))
         if self.var_tg.get()    == "on": self.toggle_tg   (ctk.StringVar(value="off"))
         if self.var_zprtx.get() == "on": self.toggle_zprtx(ctk.StringVar(value="off"))
@@ -1425,8 +1413,14 @@ class ProximityApp(ctk.CTk):
             sw2, sh2 = self.winfo_screenwidth(), self.winfo_screenheight()
             self.geometry(f"{w}x{h}+{(sw2-w)//2}+{(sh2-h)//2}")
             self._build_main_ui()
-            self.deiconify()
-            self._fade_in()
+            if self.settings.get("start_minimized"):
+                # skip
+                self.attributes("-alpha", 1.0)
+                self.withdraw()
+                threading.Thread(target=self._create_tray, daemon=True).start()
+            else:
+                self.deiconify()
+                self._fade_in()
 
         pulse_tick()
         splash.after(200, grow_line)
@@ -1469,6 +1463,9 @@ class ProximityApp(ctk.CTk):
 
         self.btn_panic = self._create_panic_button(self.main_container)
         self.btn_panic.place(relx=0.96, rely=0.03, anchor="ne", x=-40)
+
+        self.btn_settings = self._create_settings_button(self.main_container)
+        self.btn_settings.place(relx=0.04, rely=0.03, anchor="nw")
 
         self.header = ctk.CTkLabel(self.main_container,
                                    text=LOCALES[self.current_lang]["header"],
@@ -1530,10 +1527,6 @@ class ProximityApp(ctk.CTk):
     #panic button
 
     def _create_panic_button(self, parent):
-        """Vector-drawn power-button icon (arc + stem, no image asset), sized
-        to match the EN/RU language button exactly. Clicking it instantly
-        kills all 4 services -- no confirmation dialog, deliberately separate
-        from the normal on_closing() warning flow."""
         ICON_SIZE = 16
         IDLE_BG    = "#12121e"
 
@@ -1585,14 +1578,151 @@ class ProximityApp(ctk.CTk):
 
         return frame
 
+    #settings
+
+    def _create_settings_button(self, parent):
+        ICON_SIZE = 16
+        IDLE_BG    = "#12121e"
+
+        frame = ctk.CTkFrame(parent, width=34, height=24,
+                             fg_color=IDLE_BG, corner_radius=8,
+                             border_width=1, border_color=COLOR_BORDER,
+                             cursor="hand2")
+        frame.pack_propagate(False)
+
+        canvas = ctk.CTkCanvas(frame, width=ICON_SIZE, height=ICON_SIZE,
+                               bg=IDLE_BG, highlightthickness=0, cursor="hand2")
+        canvas.pack(expand=True)
+
+        def draw(color):
+            canvas.delete("all")
+            cx = cy = ICON_SIZE / 2
+            r_outer   = ICON_SIZE * 0.28
+            r_inner   = ICON_SIZE * 0.12
+            tooth_len = ICON_SIZE * 0.13
+            teeth     = 8
+            for i in range(teeth):
+                angle = math.radians(i * (360 / teeth))
+                x1 = cx + r_outer * math.cos(angle)
+                y1 = cy + r_outer * math.sin(angle)
+                x2 = cx + (r_outer + tooth_len) * math.cos(angle)
+                y2 = cy + (r_outer + tooth_len) * math.sin(angle)
+                canvas.create_line(x1, y1, x2, y2, fill=color, width=1.5)
+            canvas.create_oval(cx - r_outer, cy - r_outer, cx + r_outer, cy + r_outer,
+                               outline=color, width=1.4)
+            canvas.create_oval(cx - r_inner, cy - r_inner, cx + r_inner, cy + r_inner,
+                               outline=color, width=1.4)
+
+        draw(COLOR_MAIN)
+
+        def on_enter(_e=None):
+            frame.configure(border_color=COLOR_MAIN, fg_color=COLOR_SECONDARY)
+            canvas.configure(bg=COLOR_SECONDARY)
+            draw("#ffffff")
+
+        def on_leave(_e=None):
+            frame.configure(border_color=COLOR_BORDER, fg_color=IDLE_BG)
+            canvas.configure(bg=IDLE_BG)
+            draw(COLOR_MAIN)
+
+        def on_click(_e=None):
+            play_ui_sound("click")
+            self.show_settings_screen()
+
+        for widget in (frame, canvas):
+            widget.bind("<Enter>", on_enter)
+            widget.bind("<Leave>", on_leave)
+            widget.bind("<Button-1>", on_click)
+
+        return frame
+
+    def show_settings_screen(self):
+        lang = self.current_lang
+        for w in self.main_container.winfo_children():
+            w.destroy()
+
+        # header
+        hdr = ctk.CTkFrame(self.main_container, fg_color="#161618", corner_radius=0, height=48)
+        hdr.pack(fill="x")
+        hdr.pack_propagate(False)
+        ctk.CTkLabel(hdr, text=LOCALES[lang]["settings_title"],
+                     font=(FONT_NAME, 13, "bold"), text_color="#e8e8e8", anchor="w"
+                     ).place(x=16, rely=0.5, anchor="w")
+        ctk.CTkLabel(hdr, text="PROXIMITY",
+                     font=(FONT_NAME, 10), text_color="#444455", anchor="e"
+                     ).place(relx=1.0, x=-16, rely=0.5, anchor="e")
+
+        # separator
+        sep = ctk.CTkCanvas(self.main_container, height=1, bg=COLOR_FRAME, highlightthickness=0)
+        sep.pack(fill="x")
+        sep.create_line(0, 0, 460, 0, fill=COLOR_MAIN, width=1)
+
+        # body
+        body = ctk.CTkFrame(self.main_container, fg_color="transparent", corner_radius=0)
+        body.pack(fill="both", expand=True, padx=20, pady=16)
+
+        def make_toggle_row(parent, label_text, var, command):
+            row = ctk.CTkFrame(parent, fg_color="#16161a", corner_radius=4,
+                               border_width=1, border_color="#2a2a35", height=52)
+            row.pack(fill="x", pady=4)
+            row.pack_propagate(False)
+
+            ctk.CTkLabel(row, text=label_text, font=(FONT_NAME, 12),
+                        text_color="#c8c8d0", anchor="w", justify="left",
+                        wraplength=280
+                        ).place(x=14, rely=0.5, anchor="w")
+
+            sw = ctk.CTkSwitch(
+                row, text="", variable=var, onvalue="on", offvalue="off", width=40,
+                command=lambda: [play_ui_sound("switch"), command(var)],
+                progress_color=COLOR_MAIN, button_color="#ffffff",
+                button_hover_color=COLOR_MAIN,
+            )
+            sw.place(relx=1.0, x=-14, rely=0.5, anchor="e")
+            return sw
+
+        make_toggle_row(body, LOCALES[lang]["settings_autostart"],
+                       self.var_autostart, self.toggle_autostart)
+        make_toggle_row(body, LOCALES[lang]["settings_start_minimized"],
+                       self.var_start_min, self.toggle_start_minimized)
+        make_toggle_row(body, LOCALES[lang]["settings_confirm_close"],
+                       self.var_confirm_close, self.toggle_confirm_close)
+
+        # footer
+        footer = ctk.CTkFrame(self.main_container, fg_color="#161618", corner_radius=0, height=44)
+        footer.pack(fill="x", side="bottom")
+        footer.pack_propagate(False)
+
+        btn_close = ctk.CTkButton(
+            footer, text=LOCALES[lang]["settings_close"],
+            width=130, height=26, corner_radius=3,
+            fg_color="#252530", border_width=1, border_color="#333344",
+            hover_color="#2e2e3d", text_color="#999aaa", font=(FONT_NAME, 11),
+            command=self.show_main_screen
+        )
+        btn_close.place(relx=1.0, x=-16, rely=0.5, anchor="e")
+
+    def _save_setting(self, key, value):
+        self.settings[key] = value
+        state = load_local_state()
+        state[key] = value
+        save_local_state(state)
+
+    def toggle_autostart(self, var):
+        on = var.get() == "on"
+        self._save_setting("autostart", on)
+        if on:
+            _ensure_autostart()
+        else:
+            _remove_autostart()
+
+    def toggle_start_minimized(self, var):
+        self._save_setting("start_minimized", var.get() == "on")
+
+    def toggle_confirm_close(self, var):
+        self._save_setting("confirm_close", var.get() == "on")
+
     def _panic_kill_all(self):
-        """Stop every currently-running service, one at a time, in a
-        background thread -- so the taskkill/net stop/sc delete calls
-        for HAPP -> TG -> WARP -> ZPRTX never pile up on the UI thread
-        at once (that's what was freezing the window before). Each
-        service is checked ('is it ON? then stop it, otherwise skip')
-        and the switch/button UI for that service is updated the
-        moment its own stop finishes, not after all four are done."""
         if self._panic_running:
             return
         self._panic_running = True
@@ -1631,9 +1761,6 @@ class ProximityApp(ctk.CTk):
         self._stop_zprtx()
 
     def _panic_mark_off(self, key):
-        """Runs back on the UI thread right after that one service's
-        stop call returns -- flips its switch/button off immediately
-        instead of waiting for all four to finish."""
         var = {"happ": self.var_happ, "tg": self.var_tg,
                "warp": self.var_warp, "zprtx": self.var_zprtx}[key]
         var.set("off")
@@ -1799,17 +1926,14 @@ class ProximityApp(ctk.CTk):
             pystray.MenuItem(l["sw_warp"],  make_tray_toggle("warp"),
                              checked=make_checked(self.var_warp),  radio=False),
             pystray.Menu.SEPARATOR,
+            pystray.MenuItem(l["tray_panic"], lambda icon, item: self.after(0, self._panic_kill_all)),
+            pystray.Menu.SEPARATOR,
             pystray.MenuItem(l["tray_exit"], self._tray_exit),
         )
         self.tray_icon = pystray.Icon("Proximity", image, "Proximity", menu)
         self.tray_icon.run()
 
     def _tray_toggle_service(self, key):
-        """Runs on the main/Tk thread (scheduled via self.after from the tray
-        thread, since Tk widgets can't be touched off-thread). Flips the
-        service through the exact same toggle_* methods the main switches
-        use, so tray and window can never disagree about how a service is
-        actually stopped/started."""
         mapping = {
             "happ":  (self.var_happ,  self.toggle_happ),
             "tg":    (self.var_tg,    self.toggle_tg),
@@ -1849,10 +1973,6 @@ class ProximityApp(ctk.CTk):
     #single instance
 
     def _start_single_instance_listener(self, lock_socket):
-        """Runs in the background for the whole life of the app. Whenever a
-        second launch of Proximity happens, it pings this socket (see
-        _acquire_single_instance_lock) instead of opening its own window.
-        Here we just wait for that ping and bring our own window to front."""
         def serve():
             while True:
                 try:
@@ -1908,8 +2028,9 @@ class ProximityApp(ctk.CTk):
     #close / warning
 
     def on_closing(self):
-        if "on" in (self.var_happ.get(), self.var_tg.get(),
-                    self.var_zprtx.get(), self.var_warp.get()):
+        if self.settings.get("confirm_close", True) and "on" in (
+                self.var_happ.get(), self.var_tg.get(),
+                self.var_zprtx.get(), self.var_warp.get()):
             play_ui_sound("warning")
             CustomWarningWindow(self, self.current_lang,
                                 callback_yes=self._force_close,
@@ -2125,10 +2246,6 @@ class ProximityApp(ctk.CTk):
                            shell=True, creationflags=CREATE_NO_WINDOW)
 
     def _start_zprtx(self):
-        """Launch the ZPRTX interactive console (MAIN.bat), keeping a real
-        Popen handle to that specific console window (its own PID), instead
-        of firing it through 'start' which detaches and leaves us nothing
-        to track."""
         z_dir    = os.path.abspath(os.path.join(TOOLS_DIR, "Zprtx"))
         full_bat = os.path.join(z_dir, "MAIN.bat")
         if not os.path.exists(full_bat):
@@ -2148,7 +2265,7 @@ class ProximityApp(ctk.CTk):
         """Launch Flowseal's ZAPRET console (service.bat) the same way
         _start_zprtx launches MAIN.bat -- its own console window, own PID,
         kept on hand for cleanup."""
-        z_dir    = os.path.abspath(os.path.join(TOOLS_DIR, "zapret_1.10.0"))
+        z_dir    = os.path.abspath(os.path.join(TOOLS_DIR, "zapret_1.10.1"))
         full_bat = os.path.join(z_dir, "service.bat")
         if not os.path.exists(full_bat):
             return False
@@ -2164,17 +2281,6 @@ class ProximityApp(ctk.CTk):
             return False
 
     def _stop_zprtx(self):
-        """Stop ZPRTX the same way MAIN.bat's own 'Выключить' menu option
-        does. ZPRTX installs itself as a real Windows service ('sc create
-        zprtx ...' inside MAIN.bat) plus the WinDivert/WinDivert14 driver
-        services -- none of that is a child process of the console window,
-        so killing the console (or, worse, every cmd.exe on the machine)
-        never actually stopped the bypass engine; only mirroring the bat's
-        own stop sequence does.
-
-        Both ZPRTX and ZAPRET are built on the same winws.exe bypass
-        binary, so the same cleanup sweep (plus the ZAPRET service name)
-        covers whichever one the user launched from the picker."""
         for cmd in (
             "net stop zprtx",
             "sc delete zprtx",
@@ -2192,8 +2298,7 @@ class ProximityApp(ctk.CTk):
             except Exception:
                 pass
 
-        # close only the specific MAIN.bat / service.bat console windows we
-        # opened (by their own PIDs) if still open -- never a blanket cmd.exe sweep
+        # close p
         for attr in ("_zprtx_proc", "_zapret_proc"):
             proc = getattr(self, attr, None)
             if proc is not None:
