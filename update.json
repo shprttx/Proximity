@@ -4,14 +4,14 @@
   "download_url": "https://github.com/shprttx/Proximity/releases/download/03.09.26/Proximity.exe",
   "sha256": "274aa9cd3132f32f1f7c763a4e41b1da006bf2f027f7eca4505bef3c0ad721d0",
   "notice": {
-    "id": "happpBAG",
+    "id": "happpBAGGH",
     "title": {
       "ru": "ВНИМАНИЕ",
       "en": "WARNING"
     },
     "text": {
-      "ru": "Не забудьте переустановить Happ.n/Удалите старый из о.с.n/и скачайте новый через мастер установкиn/в Proximity",
-      "en": "Don't forget to reinstall Happ.n/Remove the old version from the OSn/and download the new one via then/setup wizard in Proximity."
+      "ru": "Не забудьте переустановить Happ. Удалите старый из о.с. и скачайте новый через мастер установки в Proximity. ВНИМАНИЕ ЕСЛИ ВАМ НЕ ПРИШЛО УВЕДОМЛЕНИЕ ОБ ОБНОВЛЕНИИ ТО ОТКЛЮЧИТЕ АВТОЗАПУСК СВЕРНУТЫМ В ТРЕЙ И ПЕРЕЗАПУСТИТЕ ПРИЛОЖЕНИЕ!",
+      "en": "Don't forget to reinstall Happ. Remove the old version from the OS and download the new one via the setup wizard in Proximity. ATTENTION! IF YOU HAVE NOT RECEIVED AN UPDATE NOTIFICATION, DISABLE AUTO-START BY MINIMIZING TO TRAY AND RESTART THE APPLICATION"
     }
   }
 }
