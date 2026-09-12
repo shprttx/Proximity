@@ -20,7 +20,7 @@ import psutil
 
 #version
 
-CURRENT_VERSION = "13.08.26"
+CURRENT_VERSION = "12.09.26"
 UPDATE_URL      = "https://raw.githubusercontent.com/shprttx/Proximity/main/update.json"
 
 #design
@@ -65,8 +65,6 @@ def save_local_state(data):
         pass
 
 def pick_localized(value, lang):
-    """notice title/text in update.json can be either a plain string
-    (same for both languages) or a {'ru':..., 'en':...} dict."""
     if isinstance(value, dict):
         key = (lang or "").lower()
         return value.get(key) or value.get("ru") or value.get("en") or ""
@@ -248,9 +246,17 @@ LOCALES = {
         "launcher_zapret_sub": "by author Flowseal",
         "settings_title":            "SETTINGS",
         "settings_close":            "Close",
+        "settings_section_app":      "APPLICATION",
         "settings_autostart":        "Launch on Windows startup",
         "settings_start_minimized":  "Start minimized to tray",
         "settings_confirm_close":    "Warn before closing active services",
+        "settings_section_auto":     "AUTO-LAUNCH SERVICES",
+        "settings_section_auto_sub": "Automatically turn these on every time Proximity starts",
+        "settings_auto_happ":        "Happ",
+        "settings_auto_tg":          "TG Proxy",
+        "settings_auto_zprtx":       "YouTube + Discord ZPRTX",
+        "settings_auto_warp":        "Cloudflare WARP",
+        "settings_auto_zprtx_hint":  "Still asks ZPRTX or ZAPRET on every start",
     },
     "RU": {
         "lang_btn":        "EN",
@@ -300,9 +306,17 @@ LOCALES = {
         "launcher_zapret_sub": "от автор. Flowseal",
         "settings_title":            "НАСТРОЙКИ",
         "settings_close":            "Закрыть",
+        "settings_section_app":      "ПРИЛОЖЕНИЕ",
         "settings_autostart":        "Запуск вместе с Windows",
         "settings_start_minimized":  "Запускать свёрнутым в трей",
         "settings_confirm_close":    "Предупреждать при закрытии с активными сервисами",
+        "settings_section_auto":     "АВТОЗАПУСК УТИЛИТ",
+        "settings_section_auto_sub": "Включать эти утилиты автоматически при каждом запуске Proximity",
+        "settings_auto_happ":        "Happ",
+        "settings_auto_tg":          "TG Прокси",
+        "settings_auto_zprtx":       "ZPRTX",
+        "settings_auto_warp":        "Cloudflare WARP",
+        "settings_auto_zprtx_hint":  "Окно выбора ZPRTX/ZAPRET всё равно появится",
     },
 }
 
@@ -378,8 +392,6 @@ class BubbleBackground(ctk.CTkCanvas):
         self.after(16, self._loop)
 
     def trigger_shockwave(self, origin_x=None, origin_y=None):
-        """Red expanding ring from the panic button, physically pushing
-        nearby bubbles outward as the wavefront passes them."""
         if origin_x is None:
             origin_x = getattr(self, "width", 400) - 40
         if origin_y is None:
@@ -840,7 +852,6 @@ class CustomWarningWindow(ctk.CTkToplevel):
         btn_no.pack(pady=4, fill="x", padx=30)
 
 class ZprtxLauncherWindow(ctk.CTkToplevel):
-    # red warning
     _SHIMMER_COLORS = ["#ff0844", "#ff2f5c", "#ff4d74", "#ff2f5c"]
 
     def __init__(self, parent, lang, callback_zprtx, callback_zapret, callback_cancel=None):
@@ -861,7 +872,7 @@ class ZprtxLauncherWindow(ctk.CTkToplevel):
         if os.path.exists(ICON_PATH):
             self.after(200, lambda: self.iconbitmap(ICON_PATH))
 
-        self._resolved   = False  # True 
+        self._resolved   = False  
         self._shimmering = True
         self.protocol("WM_DELETE_WINDOW", lambda: self._on_close(callback_cancel))
 
@@ -1049,7 +1060,6 @@ class ProximityApp(ctk.CTk):
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
         self.bind("<Unmap>", self._on_minimize)
 
-        # detect services
         try:
             already_running = get_running_service_keys()
         except Exception:
@@ -1068,20 +1078,29 @@ class ProximityApp(ctk.CTk):
         self.pending_notice = None
         self._auto_update_win = None
         self._popup_shown   = False   # guards 
+        self._ready_for_popup = False # True once startup fully settles (either faded in
+                                       # or handed off to the tray) -- see _maybe_show_startup_popup
         self._zprtx_proc    = None   # Popen handle 
         self._zapret_proc   = None   # Popen handle 
         self._panic_running = False  # guards 
 
-        # settings (persisted in state.json alongside the notice dedup id)
+        # settings 
         _state = load_local_state()
         self.settings = {
             "autostart":       _state.get("autostart", True),
             "start_minimized": _state.get("start_minimized", False),
             "confirm_close":   _state.get("confirm_close", True),
+            "auto_launch":     _state.get("auto_launch", []),
         }
         self.var_autostart      = ctk.StringVar(value="on" if self.settings["autostart"]       else "off")
         self.var_start_min      = ctk.StringVar(value="on" if self.settings["start_minimized"] else "off")
         self.var_confirm_close  = ctk.StringVar(value="on" if self.settings["confirm_close"]   else "off")
+
+        _auto_launch_set = set(self.settings["auto_launch"])
+        self.var_auto_happ  = ctk.StringVar(value="on" if "happ"  in _auto_launch_set else "off")
+        self.var_auto_tg    = ctk.StringVar(value="on" if "tg"    in _auto_launch_set else "off")
+        self.var_auto_zprtx = ctk.StringVar(value="on" if "zprtx" in _auto_launch_set else "off")
+        self.var_auto_warp  = ctk.StringVar(value="on" if "warp"  in _auto_launch_set else "off")
 
         self._check_for_updates()
 
@@ -1089,7 +1108,7 @@ class ProximityApp(ctk.CTk):
         self.withdraw()
         self._show_splash()
 
-    # pdate check
+    # check
 
     def _check_for_updates(self):
         def fetch():
@@ -1108,15 +1127,31 @@ class ProximityApp(ctk.CTk):
             except Exception:
                 pass
             finally:
-                # the fetch 
                 self.after(0, self._maybe_show_startup_popup)
         threading.Thread(target=fetch, daemon=True).start()
 
     def _maybe_show_startup_popup(self):
         if self._popup_shown:
             return
-        if not self.winfo_viewable():
-            return  # splash 
+        if not self._ready_for_popup:
+            return  # startup (splash) still in progress -- will be retried
+                     # once it finishes, from finish()/_fade_in() below
+        if not (self.pending_notice or self.update_data):
+            return
+
+        # If we're currently minimized to tray (either the user minimized
+        # normally, or "start minimized to tray" sent us there directly),
+        # bring the real window back first. Two reasons: (1) a notice/
+        # update actually matters enough that the user should see it even
+        # if the app is tucked away, which is the whole point of this fix;
+        # (2) NoticeWindow/UpdateNotificationWindow are modal Toplevels
+        # (transient + grab_set) and, like the ZPRTX/ZAPRET picker, can't
+        # display correctly on a withdrawn parent -- showing one on a
+        # tray-hidden window would just hang the same way that picker did.
+        if self.tray_icon is not None or self.state() != "normal":
+            self._bring_to_front()
+            self.update_idletasks()
+
         if self.pending_notice:
             self._popup_shown = True
             NoticeWindow(self, self.current_lang, self.pending_notice,
@@ -1175,11 +1210,10 @@ class ProximityApp(ctk.CTk):
                             pct = downloaded / total
                             self.after(0, lambda p=pct: self._auto_update_progress(p))
 
-            # sanity check 
+
             if not os.path.exists(new_exe_path) or os.path.getsize(new_exe_path) < 1_000_000:
                 raise RuntimeError("downloaded file looks invalid")
 
-            # integrity check 
             expected = (expected_sha256 or "").strip().lower()
             digest = hashlib.sha256()
             with open(new_exe_path, "rb") as f:
@@ -1192,7 +1226,7 @@ class ProximityApp(ctk.CTk):
                     pass
                 raise RuntimeError("sha256 mismatch or missing -- refusing to install")
 
-            # files
+
             try:
                 os.remove(new_exe_path + ":Zone.Identifier")
             except OSError:
@@ -1234,7 +1268,6 @@ class ProximityApp(ctk.CTk):
             ")\r\n"
             "\r\n"
             ":done\r\n"
-            # small
             "timeout /t 2 /nobreak >NUL\r\n"
             f'start "" "{current_exe}"\r\n'
             'del "%~f0"\r\n'
@@ -1413,11 +1446,20 @@ class ProximityApp(ctk.CTk):
             sw2, sh2 = self.winfo_screenwidth(), self.winfo_screenheight()
             self.geometry(f"{w}x{h}+{(sw2-w)//2}+{(sh2-h)//2}")
             self._build_main_ui()
+            self._run_auto_launch_services()
             if self.settings.get("start_minimized"):
-                # skip
                 self.attributes("-alpha", 1.0)
                 self.withdraw()
+                self._ready_for_popup = True
                 threading.Thread(target=self._create_tray, daemon=True).start()
+                # the update/notice fetch runs on its own background thread
+                # and calls _maybe_show_startup_popup() when it completes --
+                # but if it already finished before we got here (fast
+                # network, slow splash), that earlier call returned early
+                # because _ready_for_popup wasn't set yet. Check once more
+                # now that it is, instead of relying solely on the fetch
+                # thread's own callback timing.
+                self.after(300, self._maybe_show_startup_popup)
             else:
                 self.deiconify()
                 self._fade_in()
@@ -1431,6 +1473,7 @@ class ProximityApp(ctk.CTk):
         if alpha < 1.0:
             self.after(16, lambda: self._fade_in(alpha))
         else:
+            self._ready_for_popup = True
             self.after(200, self._maybe_show_startup_popup)
 
     #ui
@@ -1451,21 +1494,6 @@ class ProximityApp(ctk.CTk):
         """Fill main_container with the home screen widgets."""
         for w in self.main_container.winfo_children():
             w.destroy()
-
-        self.btn_lang = ctk.CTkButton(
-            self.main_container, text=LOCALES[self.current_lang]["lang_btn"],
-            width=34, height=24, fg_color="#12121e", border_color=COLOR_BORDER,
-            border_width=1, hover_color=COLOR_SECONDARY, corner_radius=8,
-            text_color=COLOR_MAIN, font=(FONT_NAME, 10, "bold"),
-            command=self.toggle_language
-        )
-        self.btn_lang.place(relx=0.96, rely=0.03, anchor="ne")
-
-        self.btn_panic = self._create_panic_button(self.main_container)
-        self.btn_panic.place(relx=0.96, rely=0.03, anchor="ne", x=-40)
-
-        self.btn_settings = self._create_settings_button(self.main_container)
-        self.btn_settings.place(relx=0.04, rely=0.03, anchor="nw")
 
         self.header = ctk.CTkLabel(self.main_container,
                                    text=LOCALES[self.current_lang]["header"],
@@ -1497,6 +1525,21 @@ class ProximityApp(ctk.CTk):
                      font=(FONT_NAME, 11, "italic"), text_color="#444455"
                      ).pack(side="bottom", pady=12)
 
+        self.btn_lang = ctk.CTkButton(
+            self.main_container, text=LOCALES[self.current_lang]["lang_btn"],
+            width=34, height=24, fg_color="#12121e", border_color=COLOR_BORDER,
+            border_width=1, hover_color=COLOR_SECONDARY, corner_radius=8,
+            text_color=COLOR_MAIN, font=(FONT_NAME, 10, "bold"),
+            command=self.toggle_language
+        )
+        self.btn_lang.place(relx=0.96, rely=0.03, anchor="ne")
+
+        self.btn_panic = self._create_panic_button(self.main_container)
+        self.btn_panic.place(relx=0.96, rely=0.03, anchor="ne", x=-40)
+
+        self.btn_settings = self._create_settings_button(self.main_container)
+        self.btn_settings.place(relx=0.04, rely=0.03, anchor="nw")
+
     def _sync_open_buttons(self):
         """Light up ↗ buttons for every toggle that is currently ON."""
         mapping = {
@@ -1517,16 +1560,25 @@ class ProximityApp(ctk.CTk):
                               border_color="#222230", text_color="#555566")
 
     def _animate_header(self):
-        try:
-            self.header.configure(text_color=PULSE_COLORS[self.pulse_step])
-            self.pulse_step = (self.pulse_step + 1) % len(PULSE_COLORS)
-            self.after(140, self._animate_header)
-        except Exception:
-            pass
+        token = self.header
+        def tick():
+            if self.header is not token:
+                return 
+            try:
+                self.header.configure(text_color=PULSE_COLORS[self.pulse_step])
+                self.pulse_step = (self.pulse_step + 1) % len(PULSE_COLORS)
+                self.after(140, tick)
+            except Exception:
+                pass
+        tick()
 
-    #panic button
+    #button
 
     def _create_panic_button(self, parent):
+        """Vector-drawn power-button icon (arc + stem, no image asset), sized
+        to match the EN/RU language button exactly. Clicking it instantly
+        kills all 4 services -- no confirmation dialog, deliberately separate
+        from the normal on_closing() warning flow."""
         ICON_SIZE = 16
         IDLE_BG    = "#12121e"
 
@@ -1656,21 +1708,49 @@ class ProximityApp(ctk.CTk):
         sep = ctk.CTkCanvas(self.main_container, height=1, bg=COLOR_FRAME, highlightthickness=0)
         sep.pack(fill="x")
         sep.create_line(0, 0, 460, 0, fill=COLOR_MAIN, width=1)
+        body = ctk.CTkScrollableFrame(self.main_container, fg_color="transparent",
+                                      corner_radius=0, scrollbar_button_color="#2a2a35",
+                                      scrollbar_button_hover_color=COLOR_MAIN)
+        body.pack(fill="both", expand=True, padx=16, pady=(12, 0))
+        body.update_idletasks()
 
-        # body
-        body = ctk.CTkFrame(self.main_container, fg_color="transparent", corner_radius=0)
-        body.pack(fill="both", expand=True, padx=20, pady=16)
+        ROW_TEXT_WRAP = 300 
 
-        def make_toggle_row(parent, label_text, var, command):
-            row = ctk.CTkFrame(parent, fg_color="#16161a", corner_radius=4,
-                               border_width=1, border_color="#2a2a35", height=52)
-            row.pack(fill="x", pady=4)
-            row.pack_propagate(False)
+        def make_section_label(parent, text, subtitle=None):
+            wrap = ctk.CTkFrame(parent, fg_color="transparent")
+            wrap.pack(fill="x", pady=(16, 8))
+            row = ctk.CTkFrame(wrap, fg_color="transparent")
+            row.pack(fill="x")
+            ctk.CTkLabel(row, text=text, font=(FONT_NAME, 12, "bold"),
+                        text_color=COLOR_MAIN, anchor="w").pack(side="left")
+            line = ctk.CTkFrame(row, fg_color="#242432", height=1)
+            line.pack(side="left", fill="x", expand=True, padx=(8, 0))
+            if subtitle:
+                ctk.CTkLabel(wrap, text=subtitle, font=(FONT_NAME, 11),
+                            text_color="#777788", anchor="w", justify="left",
+                            wraplength=380).pack(fill="x", pady=(4, 0))
 
-            ctk.CTkLabel(row, text=label_text, font=(FONT_NAME, 12),
-                        text_color="#c8c8d0", anchor="w", justify="left",
-                        wraplength=280
-                        ).place(x=14, rely=0.5, anchor="w")
+        def make_toggle_row(parent, label_text, var, command, hint=None, first=False):
+            row = ctk.CTkFrame(parent, fg_color="#15151c", corner_radius=0,
+                               border_width=1, border_color="#242432")
+            row.pack(fill="x")
+            if first:
+                row.configure(corner_radius=10)
+
+            row.grid_columnconfigure(0, weight=1)
+            row.grid_columnconfigure(1, weight=0)
+
+            label_wrap = ctk.CTkFrame(row, fg_color="transparent")
+            label_wrap.grid(row=0, column=0, sticky="w", padx=(14, 8), pady=10)
+            ctk.CTkLabel(label_wrap, text=label_text, font=(FONT_NAME, 13),
+                        text_color="#e0e0e8", anchor="w", justify="left",
+                        wraplength=ROW_TEXT_WRAP
+                        ).pack(anchor="w")
+            if hint:
+                ctk.CTkLabel(label_wrap, text=hint, font=(FONT_NAME, 10),
+                            text_color="#6a6a7a", anchor="w", justify="left",
+                            wraplength=ROW_TEXT_WRAP
+                            ).pack(anchor="w", pady=(2, 0))
 
             sw = ctk.CTkSwitch(
                 row, text="", variable=var, onvalue="on", offvalue="off", width=40,
@@ -1678,15 +1758,37 @@ class ProximityApp(ctk.CTk):
                 progress_color=COLOR_MAIN, button_color="#ffffff",
                 button_hover_color=COLOR_MAIN,
             )
-            sw.place(relx=1.0, x=-14, rely=0.5, anchor="e")
+            sw.grid(row=0, column=1, sticky="e", padx=14)
             return sw
 
-        make_toggle_row(body, LOCALES[lang]["settings_autostart"],
-                       self.var_autostart, self.toggle_autostart)
-        make_toggle_row(body, LOCALES[lang]["settings_start_minimized"],
-                       self.var_start_min, self.toggle_start_minimized)
-        make_toggle_row(body, LOCALES[lang]["settings_confirm_close"],
-                       self.var_confirm_close, self.toggle_confirm_close)
+        def make_group(parent, rows):
+            card = ctk.CTkFrame(parent, fg_color="transparent")
+            card.pack(fill="x")
+            for i, (label, var, command, hint) in enumerate(rows):
+                make_toggle_row(card, label, var, command, hint=hint, first=(i == 0))
+                if i < len(rows) - 1:
+                    sep_line = ctk.CTkFrame(card, fg_color="#242432", height=1)
+                    sep_line.pack(fill="x")
+
+        
+        make_section_label(body, LOCALES[lang]["settings_section_app"])
+        make_group(body, [
+            (LOCALES[lang]["settings_autostart"],       self.var_autostart,     self.toggle_autostart,       None),
+            (LOCALES[lang]["settings_start_minimized"], self.var_start_min,     self.toggle_start_minimized, None),
+            (LOCALES[lang]["settings_confirm_close"],   self.var_confirm_close, self.toggle_confirm_close,   None),
+        ])
+
+        
+        make_section_label(body, LOCALES[lang]["settings_section_auto"],
+                           subtitle=LOCALES[lang]["settings_section_auto_sub"])
+        make_group(body, [
+            (LOCALES[lang]["settings_auto_happ"],  self.var_auto_happ,  lambda v: self.toggle_auto_launch("happ",  v), None),
+            (LOCALES[lang]["settings_auto_tg"],    self.var_auto_tg,    lambda v: self.toggle_auto_launch("tg",    v), None),
+            (LOCALES[lang]["settings_auto_zprtx"], self.var_auto_zprtx, lambda v: self.toggle_auto_launch("zprtx", v), LOCALES[lang]["settings_auto_zprtx_hint"]),
+            (LOCALES[lang]["settings_auto_warp"],  self.var_auto_warp,  lambda v: self.toggle_auto_launch("warp",  v), None),
+        ])
+
+        ctk.CTkFrame(body, fg_color="transparent", height=10).pack()
 
         # footer
         footer = ctk.CTkFrame(self.main_container, fg_color="#161618", corner_radius=0, height=44)
@@ -1721,6 +1823,46 @@ class ProximityApp(ctk.CTk):
 
     def toggle_confirm_close(self, var):
         self._save_setting("confirm_close", var.get() == "on")
+
+    def toggle_auto_launch(self, key, var):
+        current = set(self.settings.get("auto_launch", []))
+        if var.get() == "on":
+            current.add(key)
+        else:
+            current.discard(key)
+        ordered = [k for k in ("happ", "tg", "zprtx", "warp") if k in current]
+        self._save_setting("auto_launch", ordered)
+
+    def _run_auto_launch_services(self):
+        to_launch = [k for k in ("happ", "tg", "zprtx", "warp")
+                     if k in self.settings.get("auto_launch", [])]
+        if not to_launch:
+            return
+
+        mapping = {
+            "happ":  (self.var_happ,  self.toggle_happ),
+            "tg":    (self.var_tg,    self.toggle_tg),
+            "zprtx": (self.var_zprtx, self.toggle_zprtx),
+            "warp":  (self.var_warp,  self.toggle_warp),
+        }
+
+        def launch_one(i=0):
+            if i >= len(to_launch):
+                return
+            key = to_launch[i]
+            var, toggle_fn = mapping[key]
+            if var.get() != "on":
+                var.set("on")
+                switch = self.switch_widgets.get(key)
+                if switch is not None:
+                    try:
+                        switch.select()
+                    except Exception:
+                        pass
+                toggle_fn(var)
+            self.after(600, lambda: launch_one(i + 1))
+
+        self.after(700, launch_one)
 
     def _panic_kill_all(self):
         if self._panic_running:
@@ -1931,6 +2073,10 @@ class ProximityApp(ctk.CTk):
             pystray.MenuItem(l["tray_exit"], self._tray_exit),
         )
         self.tray_icon = pystray.Icon("Proximity", image, "Proximity", menu)
+        
+        if self.state() == "normal":
+            self.tray_icon = None
+            return
         self.tray_icon.run()
 
     def _tray_toggle_service(self, key):
@@ -1992,8 +2138,6 @@ class ProximityApp(ctk.CTk):
         threading.Thread(target=serve, daemon=True).start()
 
     def _bring_to_front(self):
-        """Same effect as clicking 'Open' in the tray menu: closes the tray
-        icon if we're minimized to tray, and restores/focuses the window."""
         if self.tray_icon is not None:
             try:
                 self.tray_icon.stop()
@@ -2039,7 +2183,6 @@ class ProximityApp(ctk.CTk):
             self._force_close()
 
     def _dismiss_warning(self):
-        """Close the warning dialog without touching toggle/arrow state."""
         for w in self.winfo_children():
             if isinstance(w, ctk.CTkToplevel):
                 w.grab_release()
@@ -2262,9 +2405,6 @@ class ProximityApp(ctk.CTk):
             return False
 
     def _start_zapret(self):
-        """Launch Flowseal's ZAPRET console (service.bat) the same way
-        _start_zprtx launches MAIN.bat -- its own console window, own PID,
-        kept on hand for cleanup."""
         z_dir    = os.path.abspath(os.path.join(TOOLS_DIR, "zapret_1.10.1"))
         full_bat = os.path.join(z_dir, "service.bat")
         if not os.path.exists(full_bat):
@@ -2298,7 +2438,6 @@ class ProximityApp(ctk.CTk):
             except Exception:
                 pass
 
-        # close p
         for attr in ("_zprtx_proc", "_zapret_proc"):
             proc = getattr(self, attr, None)
             if proc is not None:
@@ -2312,18 +2451,16 @@ class ProximityApp(ctk.CTk):
                 setattr(self, attr, None)
 
     def _zprtx_revert_off(self):
-        """Flips the ZPRTX switch/button back to the 'off' look -- used
-        when the launcher picker is cancelled, or the chosen engine
-        failed to start."""
         self.var_zprtx.set("off")
         self.switch_widgets["zprtx"].deselect()
         self.open_buttons["zprtx"].configure(state="disabled", fg_color="transparent",
                                              border_color="#222230", text_color="#555566")
 
     def _open_zprtx_launcher(self, on_result=None, on_cancel=None):
-        """Shows the ZPRTX-vs-ZAPRET picker. on_result(bool) is called with
-        whether the chosen engine actually started; on_cancel() is called
-        if the picker is dismissed (X button) without a choice."""
+        if self.tray_icon is not None or self.state() != "normal":
+            self._bring_to_front()
+            self.update_idletasks()
+
         def choose_zprtx():
             ok = self._start_zprtx()
             if on_result:
