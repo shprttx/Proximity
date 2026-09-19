@@ -18,12 +18,10 @@ from PIL import Image
 import pystray
 import psutil
 
-#version
 
-CURRENT_VERSION = "12.09.26"
+CURRENT_VERSION = "19.09.26"
 UPDATE_URL      = "https://raw.githubusercontent.com/shprttx/Proximity/main/update.json"
 
-#design
 
 COLOR_MAIN      = "#00f2ff"
 COLOR_SECONDARY = "#00c8d4"
@@ -34,9 +32,11 @@ COLOR_BORDER    = "#1b142c"
 COLOR_ACCENT    = "#ff0844"
 FONT_NAME       = "Segoe UI"
 
+WINDOW_SIZE_NORMAL    = (460, 650)
+WINDOW_SIZE_INSTALLER = (800, 600)
+
 PULSE_COLORS = ["#00f2ff", "#1ae5ff", "#33d8ff", "#4dcaff", "#66bdff", "#4dcaff", "#33d8ff", "#1ae5ff"]
 
-#local state 
 
 def get_state_dir():
     base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
@@ -70,7 +70,6 @@ def pick_localized(value, lang):
         return value.get(key) or value.get("ru") or value.get("en") or ""
     return value or ""
 
-#system
 
 def resource_path(relative_path):
     try:
@@ -83,7 +82,6 @@ AUTOSTART_KEY_PATH = r"Software\Microsoft\Windows\CurrentVersion\Run"
 AUTOSTART_VALUE    = "Proximity"
 
 def _autostart_command():
-    # frozen 
     if getattr(sys, "frozen", False):
         return f'"{sys.executable}"'
     return f'"{sys.executable}" "{os.path.abspath(sys.argv[0])}"'
@@ -109,18 +107,16 @@ def _remove_autostart():
 SINGLE_INSTANCE_PORT = 51837
 
 if not ctypes.windll.shell32.IsUserAnAdmin():
-    # Cheap
     try:
         with socket.create_connection(("127.0.0.1", SINGLE_INSTANCE_PORT), timeout=0.3) as c:
             c.sendall(b"SHOW")
         sys.exit()
     except OSError:
-        pass  # 
+        pass
 
     ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
     sys.exit()
 
-# single 
 
 def _acquire_single_instance_lock():
     try:
@@ -147,7 +143,6 @@ TOOLS_DIR        = resource_path("Tools")
 CREATE_NO_WINDOW = 0x08000000
 ICON_PATH        = os.path.join(TOOLS_DIR, "Proximity.ico")
 
-# real process names 
 SERVICE_PROCESS_NAMES = {
     "happ":  ("happ.exe",),
     "tg":    ("tgwsproxy_windows.exe",),
@@ -155,7 +150,6 @@ SERVICE_PROCESS_NAMES = {
     "warp":  ("cloudflare warp.exe",),
 }
 
-#helpers
 
 def color_fade(c1, c2, steps):
     r1, g1, b1 = int(c1[1:3], 16), int(c1[3:5], 16), int(c1[5:7], 16)
@@ -195,7 +189,6 @@ def play_ui_sound(sound_type):
     if os.path.exists(path):
         threading.Thread(target=winsound.PlaySound, args=(path, winsound.SND_FILENAME), daemon=True).start()
 
-#loc
 
 LOCALES = {
     "EN": {
@@ -213,6 +206,10 @@ LOCALES = {
         "installer_happ":  "INSTALL HAPP",
         "installer_warp":  "INSTALL CLOUDFLARE WARP",
         "installer_close": "Close Setup Wizard",
+        "installer_pick_hint":   "Select a tool from the list\nto see details and install it",
+        "installer_install_btn": "Install",
+        "installer_happ_title":  "Happ VPN",
+        "installer_warp_title":  "Cloudflare WARP",
         "info_happ":       "Happ VPN is an advanced routing tool.\n\nDevelopers: Flyfrog LLC\n\nPlease read the instructions\n\nbefore installing!",
         "info_tg":         "Telegram Proxy creates a secure WebSocket tunnel.\n\nDeveloper: Flowseal",
         "info_zprtx":      "DPI bypass engine.\nModifies packets at the driver level to unblock websites.",
@@ -273,6 +270,10 @@ LOCALES = {
         "installer_happ":  "УСТАНОВИТЬ HAPP",
         "installer_warp":  "УСТАНОВИТЬ CLOUDFLARE WARP",
         "installer_close": "Закрыть Мастер установки",
+        "installer_pick_hint":   "Выберите утилиту из списка слева,\nчтобы увидеть описание и установить",
+        "installer_install_btn": "Установить",
+        "installer_happ_title":  "Happ VPN",
+        "installer_warp_title":  "Cloudflare WARP",
         "info_happ":       "Happ vpn - это продвинутый инструмент маршрутизации.\n\nРазработчики - Flyfrog LLC\n\nПеред тем как установить\n\nпрочтите инструкцию!\n\nТРЕБУЕТСЯ УСТАНОВКА В Мастер установки!",
         "info_tg":         "Telegram Proxy создает защищенный WebSocket туннель\n\nРазработчик - Flowseal",
         "info_zprtx":      "Движок обхода DPI.\nМодифицирует пакеты на уровне драйвера для разблокировки сайтов.",
@@ -320,7 +321,6 @@ LOCALES = {
     },
 }
 
-#bubble
 
 class BubbleBackground(ctk.CTkCanvas):
     def __init__(self, master, **kwargs):
@@ -372,7 +372,6 @@ class BubbleBackground(ctk.CTkCanvas):
             b["y"] -= b["speed"]
             b["x"] += math.sin(b["y"] / 40.0 + b["swing_offset"]) * 0.25
 
-            # shockwave 
             if b["push_x"] or b["push_y"]:
                 b["x"] += b["push_x"]
                 b["y"] += b["push_y"]
@@ -444,7 +443,6 @@ class BubbleBackground(ctk.CTkCanvas):
                     pass
         step()
 
-#update 
 
 class UpdateNotificationWindow(ctk.CTkToplevel):
     def __init__(self, parent, lang, update_data):
@@ -525,7 +523,6 @@ class UpdateNotificationWindow(ctk.CTkToplevel):
         self._pulsing      = False
         self.after(80, self._fade_in)
 
-    #animation
 
     def _fade_in(self, alpha=0.0):
         alpha = min(alpha + 0.07, 1.0)
@@ -633,7 +630,6 @@ class UpdateNotificationWindow(ctk.CTkToplevel):
         except Exception:
             return False
 
-#notice 
 
 class NoticeWindow(ctk.CTkToplevel):
     def __init__(self, parent, lang, notice_data, on_dismiss=None, on_close_show_next=None):
@@ -691,7 +687,6 @@ class NoticeWindow(ctk.CTkToplevel):
         self._pulsing      = False
         self.after(80, self._fade_in)
 
-    #animation 
 
     def _fade_in(self, alpha=0.0):
         alpha = min(alpha + 0.14, 1.0)
@@ -799,7 +794,6 @@ class NoticeWindow(ctk.CTkToplevel):
             except Exception:
                 pass
 
-#custom warning
 
 class CustomWarningWindow(ctk.CTkToplevel):
     def __init__(self, parent, lang, callback_yes, callback_no):
@@ -1039,11 +1033,9 @@ class SimpleInfoWindow(ctk.CTkToplevel):
         btn_ok.bind("<Leave>", lambda e: btn_ok.configure(text_color=accent))
         btn_ok.pack(pady=4, fill="x", padx=30, side="bottom")
 
-#main
 
 class ProximityApp(ctk.CTk):
 
-    #init
 
     def __init__(self):
         super().__init__()
@@ -1065,7 +1057,6 @@ class ProximityApp(ctk.CTk):
         except Exception:
             already_running = set()
 
-        # toggle
         self.var_happ  = ctk.StringVar(value="on" if "happ"  in already_running else "off")
         self.var_tg    = ctk.StringVar(value="on" if "tg"    in already_running else "off")
         self.var_zprtx = ctk.StringVar(value="on" if "zprtx" in already_running else "off")
@@ -1077,14 +1068,12 @@ class ProximityApp(ctk.CTk):
         self.update_data    = None
         self.pending_notice = None
         self._auto_update_win = None
-        self._popup_shown   = False   # guards 
-        self._ready_for_popup = False # True once startup fully settles (either faded in
-                                       # or handed off to the tray) -- see _maybe_show_startup_popup
-        self._zprtx_proc    = None   # Popen handle 
-        self._zapret_proc   = None   # Popen handle 
-        self._panic_running = False  # guards 
+        self._popup_shown   = False
+        self._ready_for_popup = False
+        self._zprtx_proc    = None
+        self._zapret_proc   = None
+        self._panic_running = False
 
-        # settings 
         _state = load_local_state()
         self.settings = {
             "autostart":       _state.get("autostart", True),
@@ -1104,11 +1093,13 @@ class ProximityApp(ctk.CTk):
 
         self._check_for_updates()
 
+        w0, h0 = WINDOW_SIZE_NORMAL
+        sw0, sh0 = self.winfo_screenwidth(), self.winfo_screenheight()
+        self.geometry(f"{w0}x{h0}+{(sw0-w0)//2}+{(sh0-h0)//2}")
         self.attributes("-alpha", 0.0)
-        self.withdraw()
+        self.deiconify()
         self._show_splash()
 
-    # check
 
     def _check_for_updates(self):
         def fetch():
@@ -1134,20 +1125,10 @@ class ProximityApp(ctk.CTk):
         if self._popup_shown:
             return
         if not self._ready_for_popup:
-            return  # startup (splash) still in progress -- will be retried
-                     # once it finishes, from finish()/_fade_in() below
+            return
         if not (self.pending_notice or self.update_data):
             return
 
-        # If we're currently minimized to tray (either the user minimized
-        # normally, or "start minimized to tray" sent us there directly),
-        # bring the real window back first. Two reasons: (1) a notice/
-        # update actually matters enough that the user should see it even
-        # if the app is tucked away, which is the whole point of this fix;
-        # (2) NoticeWindow/UpdateNotificationWindow are modal Toplevels
-        # (transient + grab_set) and, like the ZPRTX/ZAPRET picker, can't
-        # display correctly on a withdrawn parent -- showing one on a
-        # tray-hidden window would just hang the same way that picker did.
         if self.tray_icon is not None or self.state() != "normal":
             self._bring_to_front()
             self.update_idletasks()
@@ -1174,7 +1155,6 @@ class ProximityApp(ctk.CTk):
         save_local_state(state)
         self.pending_notice = None
 
-    #auto-update
 
     def _launch_auto_update(self, download_url, expected_sha256=""):
         if not getattr(sys, "frozen", False):
@@ -1308,7 +1288,6 @@ class ProximityApp(ctk.CTk):
                          LOCALES[self.current_lang]["upd_auto_error"],
                          accent=COLOR_ACCENT)
 
-    #splash
 
     def _show_splash(self):
         W, H = 480, 300
@@ -1316,10 +1295,13 @@ class ProximityApp(ctk.CTk):
         splash.geometry(f"{W}x{H}")
         splash.overrideredirect(True)
         splash.configure(fg_color=COLOR_BG)
+        splash.attributes("-topmost", True)
 
         self.update_idletasks()
         sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
         splash.geometry(f"+{(sw-W)//2}+{(sh-H)//2}")
+        splash.lift()
+        splash.focus_force()
 
         if os.path.exists(ICON_PATH):
             splash.after(200, lambda: splash.iconbitmap(ICON_PATH))
@@ -1442,7 +1424,7 @@ class ProximityApp(ctk.CTk):
             except Exception:
                 pass
             self.update_idletasks()
-            w, h = 460, 650
+            w, h = WINDOW_SIZE_NORMAL
             sw2, sh2 = self.winfo_screenwidth(), self.winfo_screenheight()
             self.geometry(f"{w}x{h}+{(sw2-w)//2}+{(sh2-h)//2}")
             self._build_main_ui()
@@ -1452,13 +1434,6 @@ class ProximityApp(ctk.CTk):
                 self.withdraw()
                 self._ready_for_popup = True
                 threading.Thread(target=self._create_tray, daemon=True).start()
-                # the update/notice fetch runs on its own background thread
-                # and calls _maybe_show_startup_popup() when it completes --
-                # but if it already finished before we got here (fast
-                # network, slow splash), that earlier call returned early
-                # because _ready_for_popup wasn't set yet. Check once more
-                # now that it is, instead of relying solely on the fetch
-                # thread's own callback timing.
                 self.after(300, self._maybe_show_startup_popup)
             else:
                 self.deiconify()
@@ -1468,15 +1443,39 @@ class ProximityApp(ctk.CTk):
         splash.after(200, grow_line)
 
     def _fade_in(self, alpha=0.0):
-        alpha += 0.06
+        alpha += 0.35
         self.attributes("-alpha", min(alpha, 1.0))
         if alpha < 1.0:
-            self.after(16, lambda: self._fade_in(alpha))
+            self.after(5, lambda: self._fade_in(alpha))
         else:
             self._ready_for_popup = True
             self.after(200, self._maybe_show_startup_popup)
 
-    #ui
+    def _animate_resize_to(self, target_w, target_h, on_done=None):
+        self.update_idletasks()
+        cur_x, cur_y = self.winfo_x(), self.winfo_y()
+        cur_w, cur_h = self.winfo_width(), self.winfo_height()
+        center_x = cur_x + cur_w // 2
+        center_y = cur_y + cur_h // 2
+
+        overlay = ctk.CTkFrame(self, fg_color="#000000", corner_radius=0, border_width=0)
+        overlay.place(x=0, y=0, relwidth=1, relheight=1)
+        overlay.lift()
+        self.update_idletasks()
+
+        sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
+        new_x = center_x - target_w // 2
+        new_y = center_y - target_h // 2
+        new_x = max(0, min(new_x, sw - target_w))
+        new_y = max(0, min(new_y, sh - target_h))
+        self.geometry(f"{target_w}x{target_h}+{new_x}+{new_y}")
+        self.update_idletasks()
+        if on_done:
+            on_done()
+        self.update_idletasks()
+        overlay.lift()
+        self.after(60, overlay.destroy)
+
 
     def _build_main_ui(self):
         self.bg_canvas = BubbleBackground(self)
@@ -1572,7 +1571,6 @@ class ProximityApp(ctk.CTk):
                 pass
         tick()
 
-    #button
 
     def _create_panic_button(self, parent):
         """Vector-drawn power-button icon (arc + stem, no image asset), sized
@@ -1630,7 +1628,6 @@ class ProximityApp(ctk.CTk):
 
         return frame
 
-    #settings
 
     def _create_settings_button(self, parent):
         ICON_SIZE = 16
@@ -1679,7 +1676,8 @@ class ProximityApp(ctk.CTk):
 
         def on_click(_e=None):
             play_ui_sound("click")
-            self.show_settings_screen()
+            w, h = WINDOW_SIZE_INSTALLER
+            self._animate_resize_to(w, h, on_done=self.show_settings_screen)
 
         for widget in (frame, canvas):
             widget.bind("<Enter>", on_enter)
@@ -1693,7 +1691,6 @@ class ProximityApp(ctk.CTk):
         for w in self.main_container.winfo_children():
             w.destroy()
 
-        # header
         hdr = ctk.CTkFrame(self.main_container, fg_color="#161618", corner_radius=0, height=48)
         hdr.pack(fill="x")
         hdr.pack_propagate(False)
@@ -1704,17 +1701,40 @@ class ProximityApp(ctk.CTk):
                      font=(FONT_NAME, 10), text_color="#444455", anchor="e"
                      ).place(relx=1.0, x=-16, rely=0.5, anchor="e")
 
-        # separator
-        sep = ctk.CTkCanvas(self.main_container, height=1, bg=COLOR_FRAME, highlightthickness=0)
+        sep_h = 2
+        sep = ctk.CTkCanvas(self.main_container, height=sep_h, bg="#161618", highlightthickness=0)
         sep.pack(fill="x")
-        sep.create_line(0, 0, 460, 0, fill=COLOR_MAIN, width=1)
+
+        def shimmer_tick(offset=[0]):
+            try:
+                if not sep.winfo_exists():
+                    return
+                width = sep.winfo_width() or 800
+            except Exception:
+                return
+            sep.delete("shimmer")
+            n = len(PULSE_COLORS)
+            seg_w = max(24, width // (n * 2))
+            offset[0] = (offset[0] + 4) % seg_w
+            cx = -seg_w - offset[0]
+            i = 0
+            while cx < width + seg_w:
+                color = PULSE_COLORS[i % n]
+                sep.create_line(cx, sep_h/2, cx + seg_w, sep_h/2,
+                                fill=color, width=sep_h, tags="shimmer")
+                cx += seg_w
+                i += 1
+            self.main_container.after(45, shimmer_tick)
+
+        self.main_container.after(30, shimmer_tick)
+
         body = ctk.CTkScrollableFrame(self.main_container, fg_color="transparent",
                                       corner_radius=0, scrollbar_button_color="#2a2a35",
                                       scrollbar_button_hover_color=COLOR_MAIN)
         body.pack(fill="both", expand=True, padx=16, pady=(12, 0))
         body.update_idletasks()
 
-        ROW_TEXT_WRAP = 300 
+        ROW_TEXT_WRAP = 640
 
         def make_section_label(parent, text, subtitle=None):
             wrap = ctk.CTkFrame(parent, fg_color="transparent")
@@ -1728,7 +1748,7 @@ class ProximityApp(ctk.CTk):
             if subtitle:
                 ctk.CTkLabel(wrap, text=subtitle, font=(FONT_NAME, 11),
                             text_color="#777788", anchor="w", justify="left",
-                            wraplength=380).pack(fill="x", pady=(4, 0))
+                            wraplength=700).pack(fill="x", pady=(4, 0))
 
         def make_toggle_row(parent, label_text, var, command, hint=None, first=False):
             row = ctk.CTkFrame(parent, fg_color="#15151c", corner_radius=0,
@@ -1790,7 +1810,6 @@ class ProximityApp(ctk.CTk):
 
         ctk.CTkFrame(body, fg_color="transparent", height=10).pack()
 
-        # footer
         footer = ctk.CTkFrame(self.main_container, fg_color="#161618", corner_radius=0, height=44)
         footer.pack(fill="x", side="bottom")
         footer.pack_propagate(False)
@@ -1800,7 +1819,7 @@ class ProximityApp(ctk.CTk):
             width=130, height=26, corner_radius=3,
             fg_color="#252530", border_width=1, border_color="#333344",
             hover_color="#2e2e3d", text_color="#999aaa", font=(FONT_NAME, 11),
-            command=self.show_main_screen
+            command=self._close_settings_screen
         )
         btn_close.place(relx=1.0, x=-16, rely=0.5, anchor="e")
 
@@ -1884,10 +1903,8 @@ class ProximityApp(ctk.CTk):
                 except Exception:
                     pass
                 self.after(0, lambda k=key: self._panic_mark_off(k))
-            # already off -> nothing to do, move straight to the next one
         self.after(0, self._panic_sequence_done)
 
-    # actual stop calls -- safe to run off the UI thread, no widget touches here
     def _panic_stop_happ(self):
         subprocess.run("taskkill /IM Happ.exe /F", shell=True, creationflags=CREATE_NO_WINDOW)
 
@@ -1925,7 +1942,6 @@ class ProximityApp(ctk.CTk):
     def _panic_sequence_done(self):
         self._panic_running = False
 
-    #widge
 
     def _create_switch(self, parent, text, command, var, info_key, id_key):
         row = ctk.CTkFrame(parent, fg_color="transparent")
@@ -1990,7 +2006,6 @@ class ProximityApp(ctk.CTk):
         btn.pack(pady=8, fill="x", padx=30)
         return btn
 
-    #launch
 
     def _launch_happ(self):
         desktop = os.path.join(os.path.expanduser("~"), "Desktop")
@@ -2035,7 +2050,6 @@ class ProximityApp(ctk.CTk):
         elif id_key == "zprtx":
             self._open_zprtx_launcher()
 
-    #tra
 
     def _on_minimize(self, event):
         if event.widget == self and str(self.state()) == "iconic":
@@ -2073,7 +2087,6 @@ class ProximityApp(ctk.CTk):
             pystray.MenuItem(l["tray_exit"], self._tray_exit),
         )
         self.tray_icon = pystray.Icon("Proximity", image, "Proximity", menu)
-        
         if self.state() == "normal":
             self.tray_icon = None
             return
@@ -2116,7 +2129,6 @@ class ProximityApp(ctk.CTk):
         self.deiconify()
         self.state("normal")
 
-    #single instance
 
     def _start_single_instance_listener(self, lock_socket):
         def serve():
@@ -2148,7 +2160,6 @@ class ProximityApp(ctk.CTk):
         self.lift()
         self.focus_force()
 
-    #language
 
     def toggle_language(self):
         self.current_lang = "RU" if self.current_lang == "EN" else "EN"
@@ -2169,7 +2180,6 @@ class ProximityApp(ctk.CTk):
         try_cfg(self.btn_inst,                     text=l["btn_pdf"])
         try_cfg(self.btn_about,                    text=l["btn_about"])
 
-    #close / warning
 
     def on_closing(self):
         if self.settings.get("confirm_close", True) and "on" in (
@@ -2198,7 +2208,6 @@ class ProximityApp(ctk.CTk):
         self.bg_canvas.stop_animation()
         self.quit()
 
-    #screens
 
     def show_main_screen(self):
         self._populate_main_screen()
@@ -2208,7 +2217,6 @@ class ProximityApp(ctk.CTk):
         for w in self.main_container.winfo_children():
             w.destroy()
 
-        # header
         hdr = ctk.CTkFrame(self.main_container, fg_color="#161618", corner_radius=0, height=48)
         hdr.pack(fill="x")
         hdr.pack_propagate(False)
@@ -2219,21 +2227,94 @@ class ProximityApp(ctk.CTk):
                      font=(FONT_NAME, 10), text_color="#444455", anchor="e"
                      ).place(relx=1.0, x=-16, rely=0.5, anchor="e")
 
-        # separator
-        sep = ctk.CTkCanvas(self.main_container, height=1, bg=COLOR_FRAME, highlightthickness=0)
+        sep_h = 2
+        sep = ctk.CTkCanvas(self.main_container, height=sep_h, bg="#161618", highlightthickness=0)
         sep.pack(fill="x")
-        sep.create_line(0, 0, 460, 0, fill=COLOR_MAIN, width=1)
 
-        # body
+        def shimmer_tick(offset=[0]):
+            try:
+                if not sep.winfo_exists():
+                    return
+                width = sep.winfo_width() or 800
+            except Exception:
+                return
+            sep.delete("shimmer")
+            n = len(PULSE_COLORS)
+            seg_w = max(24, width // (n * 2))
+            offset[0] = (offset[0] + 4) % seg_w
+            cx = -seg_w - offset[0]
+            i = 0
+            while cx < width + seg_w:
+                color = PULSE_COLORS[i % n]
+                sep.create_line(cx, sep_h/2, cx + seg_w, sep_h/2,
+                                fill=color, width=sep_h, tags="shimmer")
+                cx += seg_w
+                i += 1
+            self.main_container.after(45, shimmer_tick)
+
+        self.main_container.after(30, shimmer_tick)
+
         body = ctk.CTkFrame(self.main_container, fg_color="transparent", corner_radius=0)
         body.pack(fill="both", expand=True, padx=20, pady=16)
-        ctk.CTkLabel(body, text=LOCALES[lang]["installer_label"],
-                     font=(FONT_NAME, 11), text_color="#888899", anchor="w"
-                     ).pack(anchor="w", pady=(0, 12))
 
-        def make_row(parent, label, callback):
+        left = ctk.CTkFrame(body, fg_color="transparent", width=260)
+        left.pack(side="left", fill="y", padx=(0, 16))
+        left.pack_propagate(False)
+
+        ctk.CTkLabel(left, text=LOCALES[lang]["installer_label"],
+                     font=(FONT_NAME, 11), text_color="#888899", anchor="w"
+                     ).pack(anchor="w", pady=(0, 12), fill="x")
+
+        right = ctk.CTkFrame(body, fg_color="#0c0d14", corner_radius=12,
+                             border_width=1, border_color=COLOR_BORDER)
+        right.pack(side="left", fill="both", expand=True)
+
+        placeholder = ctk.CTkLabel(
+            right, text=LOCALES[lang]["installer_pick_hint"],
+            font=(FONT_NAME, 12), text_color="#555566", justify="center", wraplength=420)
+        placeholder.pack(expand=True)
+
+        self._installer_selected_key = None
+        self._installer_right_widgets = {"placeholder": placeholder, "panel": None}
+
+        def render_details(key, title, info_text, install_cb):
+            """Fills the right-hand panel with the chosen tool's info +
+            an Install button. Rebuilds it fresh each time a different
+            entry is clicked, same destroy-and-recreate pattern already
+            used for the rest of the screens in this app."""
+            self._installer_selected_key = key
+            for w in right.winfo_children():
+                w.destroy()
+
+            top_line = ctk.CTkCanvas(right, height=2, bg="#0c0d14", highlightthickness=0)
+            top_line.pack(fill="x")
+            top_line.create_line(0, 1, 520, 1, fill=COLOR_MAIN, width=2)
+
+            ctk.CTkLabel(right, text=title, font=(FONT_NAME, 16, "bold"),
+                        text_color=COLOR_MAIN, anchor="w"
+                        ).pack(anchor="w", padx=20, pady=(16, 6))
+
+            text_scroll = ctk.CTkFrame(right, fg_color="transparent")
+            text_scroll.pack(fill="both", expand=True, padx=20)
+            ctk.CTkLabel(text_scroll, text=info_text, font=(FONT_NAME, 12),
+                        text_color="#d0d0d8", justify="left", anchor="nw",
+                        wraplength=460
+                        ).pack(anchor="nw", fill="both", expand=True)
+
+            btn_install = ctk.CTkButton(
+                right, text=LOCALES[lang]["installer_install_btn"],
+                fg_color="transparent", border_width=2, border_color=COLOR_MAIN,
+                hover_color="#0b2e35", corner_radius=10, text_color=COLOR_MAIN,
+                font=(FONT_NAME, 13, "bold"), height=42,
+                command=lambda: [play_ui_sound("click"), install_cb()]
+            )
+            btn_install.bind("<Enter>", lambda e: btn_install.configure(text_color="#ffffff"))
+            btn_install.bind("<Leave>", lambda e: btn_install.configure(text_color=COLOR_MAIN))
+            btn_install.pack(fill="x", padx=20, pady=(10, 20), side="bottom")
+
+        def make_row(parent, key, label, title, info_text, install_cb):
             row = ctk.CTkFrame(parent, fg_color="#16161a", corner_radius=4,
-                               border_width=1, border_color="#2a2a35", height=40)
+                               border_width=1, border_color="#2a2a35", height=44)
             row.pack(fill="x", pady=4)
             row.pack_propagate(False)
 
@@ -2247,27 +2328,41 @@ class ProximityApp(ctk.CTk):
             arrow = ctk.CTkLabel(inner, text="›", font=(FONT_NAME, 16), text_color="#444455")
             arrow.place(relx=1.0, x=-14, rely=0.5, anchor="e")
 
+            def refresh_selected_style():
+                is_sel = self._installer_selected_key == key
+                row.configure(fg_color="#1a2a30" if is_sel else "#16161a",
+                             border_color=COLOR_MAIN if is_sel else "#2a2a35")
+                lbl.configure(text_color="#ffffff" if is_sel else "#c8c8d0")
+                arrow.configure(text_color=COLOR_MAIN if is_sel else "#444455")
+
             def on_enter(e):
-                row.configure(fg_color="#1e1e28", border_color=COLOR_MAIN)
-                lbl.configure(text_color="#ffffff")
-                arrow.configure(text_color=COLOR_MAIN)
+                if self._installer_selected_key != key:
+                    row.configure(fg_color="#1e1e28", border_color=COLOR_MAIN)
+                    lbl.configure(text_color="#ffffff")
+                    arrow.configure(text_color=COLOR_MAIN)
             def on_leave(e):
-                row.configure(fg_color="#16161a", border_color="#2a2a35")
-                lbl.configure(text_color="#c8c8d0")
-                arrow.configure(text_color="#444455")
+                refresh_selected_style()
             def on_click(e):
                 play_ui_sound("click")
-                callback()
+                for refresh in row_refreshers:
+                    refresh()
+                render_details(key, title, info_text, install_cb)
 
             for widget in (row, inner, lbl, arrow):
                 widget.bind("<Enter>",    on_enter)
                 widget.bind("<Leave>",    on_leave)
                 widget.bind("<Button-1>", on_click)
 
-        make_row(body, LOCALES[lang]["installer_happ"], self._install_happ)
-        make_row(body, LOCALES[lang]["installer_warp"], self._install_warp)
+            row_refreshers.append(refresh_selected_style)
 
-        # footer
+        row_refreshers = []
+        make_row(left, "happ", LOCALES[lang]["installer_happ"],
+                LOCALES[lang]["installer_happ_title"], LOCALES[lang]["info_happ"],
+                self._install_happ)
+        make_row(left, "warp", LOCALES[lang]["installer_warp"],
+                LOCALES[lang]["installer_warp_title"], LOCALES[lang]["info_warp"],
+                self._install_warp)
+
         footer = ctk.CTkFrame(self.main_container, fg_color="#161618", corner_radius=0, height=44)
         footer.pack(fill="x", side="bottom")
         footer.pack_propagate(False)
@@ -2277,7 +2372,7 @@ class ProximityApp(ctk.CTk):
             width=130, height=26, corner_radius=3,
             fg_color="#252530", border_width=1, border_color="#333344",
             hover_color="#2e2e3d", text_color="#999aaa", font=(FONT_NAME, 11),
-            command=self.show_main_screen
+            command=self._close_installer_wizard
         )
         btn_close.place(relx=1.0, x=-16, rely=0.5, anchor="e")
 
@@ -2288,7 +2383,6 @@ class ProximityApp(ctk.CTk):
         for w in self.main_container.winfo_children():
             w.destroy()
 
-        # top accent
         top_line = ctk.CTkCanvas(self.main_container, height=2, bg=COLOR_FRAME, highlightthickness=0)
         top_line.pack(fill="x")
         top_line.create_line(0, 1, 460, 1, fill=COLOR_MAIN, width=2)
@@ -2306,7 +2400,6 @@ class ProximityApp(ctk.CTk):
                                   anchor="nw", wraplength=360)
         text_label.pack(fill="both", expand=True, padx=16, pady=14)
 
-        # typewriter
         chars     = list(text)
         displayed = [""]
         def type_char(i=0):
@@ -2317,7 +2410,6 @@ class ProximityApp(ctk.CTk):
                 self.main_container.after(delay, lambda: type_char(i+1))
         self.main_container.after(120, lambda: type_char(0))
 
-        # back button
         footer = ctk.CTkFrame(self.main_container, fg_color="transparent")
         footer.pack(fill="x", side="bottom", pady=16, padx=20)
 
@@ -2333,11 +2425,21 @@ class ProximityApp(ctk.CTk):
         btn_back.bind("<Leave>", lambda e: btn_back.configure(text_color=COLOR_MAIN))
         btn_back.pack(fill="x")
 
-    #installe
 
     def open_installer_window(self):
         play_ui_sound("master")
-        self.show_installer_screen()
+        w, h = WINDOW_SIZE_INSTALLER
+        self._animate_resize_to(w, h, on_done=self.show_installer_screen)
+
+    def _close_installer_wizard(self):
+        play_ui_sound("click")
+        w, h = WINDOW_SIZE_NORMAL
+        self._animate_resize_to(w, h, on_done=self.show_main_screen)
+
+    def _close_settings_screen(self):
+        play_ui_sound("click")
+        w, h = WINDOW_SIZE_NORMAL
+        self._animate_resize_to(w, h, on_done=self.show_main_screen)
 
     def _install_happ(self):
         path = os.path.join(TOOLS_DIR, "Happinstallation", "setup-Happ.x64.exe")
@@ -2354,7 +2456,6 @@ class ProximityApp(ctk.CTk):
     def open_about(self):
         webbrowser.open("https://github.com/shprttx/Proximity")
 
-    #toggle handlers
 
     def toggle_happ(self, var):
         if var.get() == "on":
@@ -2515,7 +2616,6 @@ class ProximityApp(ctk.CTk):
             subprocess.run('taskkill /IM "Cloudflare WARP.exe" /F',
                            shell=True, creationflags=CREATE_NO_WINDOW)
 
-#
 
 if __name__ == "__main__":
     app = ProximityApp()
