@@ -1,17 +1,17 @@
 {
-  "version": "12.09.26",
-  "release_url": "https://github.com/shprttx/Proximity/releases/tag/12.09.26",
-  "download_url": "https://github.com/shprttx/Proximity/releases/download/12.09.26/Proximity.exe",
-  "sha256": "9789f8a0f6cac17edac01ae21cbffaf09a718588de8a28c3ef484e7769e1dded",
+  "version": "19.09.26",
+  "release_url": "https://github.com/shprttx/Proximity/releases/tag/19.09.26",
+  "download_url": "https://github.com/shprttx/Proximity/releases/download/19.09.26/Proximity.exe",
+  "sha256": "88ca0323e9712493c242a61dca90207099c186f70aaea6a5c3befb0f7a7cfcfd",
   "notice": {
-    "id": "hGH",
+    "id": "",
     "title": {
-      "ru": "ВНИМАНИЕ",
-      "en": "WARNING"
+      "ru": "",
+      "en": ""
     },
     "text": {
-      "ru": "Баг с обновлением исправлен, можете спокойно включать настройку запуска с windows и скрытия в трей.",
-      "en": "The update bug is fixed. Feel free to turn on Run at Windows startup and Hide to tray settings."
+      "ru": "",
+      "en": ""
     }
   }
 }
