@@ -1,17 +1,21 @@
 {
-  "version": "19.09.26",
-  "release_url": "https://github.com/shprttx/Proximity/releases/tag/19.09.26",
-  "download_url": "https://github.com/shprttx/Proximity/releases/download/19.09.26/Proximity.exe",
-  "sha256": "88ca0323e9712493c242a61dca90207099c186f70aaea6a5c3befb0f7a7cfcfd",
+  "version": "27.09.26",
+  "release_url": "https://github.com/shprttx/Proximity/releases/tag/27.09.26",
+  "download_url": "https://github.com/shprttx/Proximity/releases/download/27.09.26/Proximity.exe",
+  "sha256": "a811457cd84764cde413d3b04783addbdd9412ad021af2bd7885d77ee7dc7c64",
   "notice": {
     "id": "",
-    "title": {
-      "ru": "",
-      "en": ""
-    },
-    "text": {
-      "ru": "",
-      "en": ""
-    }
-  }
+    "title": { "ru": "", "en": "" },
+    "text": { "ru": "", "en": "" }
+  },
+  "changelog": [
+    {
+      "id": "2026-09-20-update",
+      "date": "2026-09-27",
+      "type": "feature",
+      "title": { "ru": "27.09.2026 Обновление!", "en": "27.09.2026 Update!" },
+      "text": {
+        "ru": "🍂 Добро пожаловать в обновление 27.09.2026!🍂 Добавлена лента новостей прямо в приложении, теперь все апдейты движков и новые функции видны здесь, без всплывающих окон.Обновлён TG Proxy до v1.10.4 от Flowseal. Добавлен новый установщик Happ - обновите его через Мастер установки. Также появилась кнопка поддержки автора на Boosty.",
+        "en": "🍂 Welcome to the September 27, 2026 update! 🍂 A news feed has been added directly to the app; you can now view all engine updates and new features here, without pop-up windows. The TG Proxy has been updated to v1.10.4 (by Flowseal). A new Happ installer has been added—please update it via the Installation Wizard. A button to support the creator on Boosty has also been included."
+      }
 }
