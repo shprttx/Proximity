@@ -149,10 +149,11 @@
 
 ## ⚖️ Лицензия
 
-Проект распространяется на условиях лицензии [MIT](https://github.com/shprttx/Proximity/blob/main/LICENSE).
+Проект распространяется на условиях лицензии [MIT](https://github.com/shprttx/Proximity/blob/main/LICENSE). [Поддержать Автора](https://boosty.to/shprott/donate)
 
 <div align="center">
 <sub>Made with 🖤 by <a href="https://github.com/shprttx">Shprot</a></sub>
 </div>
+
 
 
