@@ -13,14 +13,28 @@ import json
 import socket
 import winreg
 import hashlib
+import datetime
 import customtkinter as ctk
 from PIL import Image
 import pystray
 import psutil
 
 
-CURRENT_VERSION = "19.09.26"
+CURRENT_VERSION = "27.09.26"
 UPDATE_URL      = "https://raw.githubusercontent.com/shprttx/Proximity/main/update.json"
+
+
+def parse_version(v):
+    """
+    Parses a version string in "DD.MM.YY" format into a comparable
+    (year, month, day) tuple. Falls back to (0, 0, 0) on any malformed
+    input so a bad/missing remote value never wins a comparison.
+    """
+    try:
+        d, m, y = str(v).strip().split(".")
+        return (int(y), int(m), int(d))
+    except Exception:
+        return (0, 0, 0)
 
 
 COLOR_MAIN      = "#00f2ff"
@@ -36,6 +50,19 @@ WINDOW_SIZE_NORMAL    = (460, 650)
 WINDOW_SIZE_INSTALLER = (800, 600)
 
 PULSE_COLORS = ["#00f2ff", "#1ae5ff", "#33d8ff", "#4dcaff", "#66bdff", "#4dcaff", "#33d8ff", "#1ae5ff"]
+
+PATCHNOTE_TYPE_COLORS = {
+    "engine_update": "#00f2ff",
+    "feature":       "#7c5cff",
+    "security":      "#ff0844",
+    "info":          "#8a8a9a",
+}
+PATCHNOTE_TYPE_ICONS = {
+    "engine_update": "⚙",
+    "feature":       "✦",
+    "security":      "⚠",
+    "info":          "ℹ",
+}
 
 
 def get_state_dir():
@@ -69,6 +96,84 @@ def pick_localized(value, lang):
         key = (lang or "").lower()
         return value.get(key) or value.get("ru") or value.get("en") or ""
     return value or ""
+
+def get_patchnotes_path():
+    return os.path.join(get_state_dir(), "patchnotes.json")
+
+def load_patchnotes_state():
+    try:
+        with open(get_patchnotes_path(), "r", encoding="utf-8") as f:
+            data = json.load(f)
+            if not isinstance(data, dict):
+                return {"messages": [], "read_ids": []}
+            data.setdefault("messages", [])
+            data.setdefault("read_ids", [])
+            return data
+    except Exception:
+        return {"messages": [], "read_ids": []}
+
+def save_patchnotes_state(data):
+    try:
+        with open(get_patchnotes_path(), "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False)
+    except Exception:
+        pass
+
+def merge_remote_changelog(remote_changelog):
+    if not isinstance(remote_changelog, list):
+        return False
+    state = load_patchnotes_state()
+    known_ids = {m.get("id") for m in state["messages"] if m.get("id")}
+    next_seq = max([m.get("_seq", 0) for m in state["messages"]], default=0) + 1
+    changed = False
+    for entry in remote_changelog:
+        if not isinstance(entry, dict):
+            continue
+        eid = entry.get("id")
+        if not eid or eid in known_ids:
+            continue
+        state["messages"].append({
+            "id":   eid,
+            "date": entry.get("date", ""),
+            "type": entry.get("type", "info"),
+            "title": entry.get("title", {}),
+            "text":  entry.get("text", {}),
+            "_seq":  next_seq,
+        })
+        next_seq += 1
+        known_ids.add(eid)
+        changed = True
+    if changed:
+        state["messages"].sort(key=lambda m: m.get("_seq", 0))
+        save_patchnotes_state(state)
+    return changed
+
+def get_unread_patchnotes_count():
+    state = load_patchnotes_state()
+    read_ids = set(state.get("read_ids", []))
+    return sum(1 for m in state["messages"] if m.get("id") not in read_ids)
+
+def mark_all_patchnotes_read():
+    state = load_patchnotes_state()
+    all_ids = [m.get("id") for m in state["messages"] if m.get("id")]
+    state["read_ids"] = all_ids
+    save_patchnotes_state(state)
+
+def _seed_test_patchnote():
+    state = load_patchnotes_state()
+    if state["messages"]:
+        return
+    now = datetime.datetime.now()
+    merge_remote_changelog([{
+        "id":   "test-" + now.strftime("%Y%m%d%H%M%S"),
+        "date": now.strftime("%d.%m.%Y %H:%M"),
+        "type": "info",
+        "title": {"ru": "Тестовое сообщение", "en": "Test message"},
+        "text": {
+            "ru": "Это тестовая запись ленты новостей - просто проверка, что всё отображается правильно.",
+            "en": "This is a test feed entry - just checking that everything renders correctly.",
+        },
+    }])
 
 
 def resource_path(relative_path):
@@ -254,6 +359,11 @@ LOCALES = {
         "settings_auto_zprtx":       "YouTube + Discord ZPRTX",
         "settings_auto_warp":        "Cloudflare WARP",
         "settings_auto_zprtx_hint":  "Still asks ZPRTX or ZAPRET on every start",
+        "patchnotes_title":   "NEWS",
+        "patchnotes_close":   "Menu",
+        "patchnotes_empty":   "No updates yet.\nWe'll post news about engine\nupdates and features here.",
+        "patchnotes_issue":   "SOMETHING'S NOT WORKING",
+        "patchnotes_donate":  "SUPPORT THE AUTHOR",
     },
     "RU": {
         "lang_btn":        "EN",
@@ -318,6 +428,11 @@ LOCALES = {
         "settings_auto_zprtx":       "ZPRTX",
         "settings_auto_warp":        "Cloudflare WARP",
         "settings_auto_zprtx_hint":  "Окно выбора ZPRTX/ZAPRET всё равно появится",
+        "patchnotes_title":   "НОВОСТИ",
+        "patchnotes_close":   "В меню",
+        "patchnotes_empty":   "Пока нет обновлений.\nЗдесь будут новости об апдейтах\nи новых функциях.",
+        "patchnotes_issue":   "ЧТО ТО НЕ РАБОТАЕТ",
+        "patchnotes_donate":  "ПОДДЕРЖАТЬ АВТОРА",
     },
 }
 
@@ -1091,6 +1206,7 @@ class ProximityApp(ctk.CTk):
         self.var_auto_zprtx = ctk.StringVar(value="on" if "zprtx" in _auto_launch_set else "off")
         self.var_auto_warp  = ctk.StringVar(value="on" if "warp"  in _auto_launch_set else "off")
 
+        _seed_test_patchnote()
         self._check_for_updates()
 
         w0, h0 = WINDOW_SIZE_NORMAL
@@ -1107,7 +1223,8 @@ class ProximityApp(ctk.CTk):
                 req = urllib.request.Request(UPDATE_URL, headers={"User-Agent": "Mozilla/5.0"})
                 with urllib.request.urlopen(req, timeout=8) as r:
                     data = json.loads(r.read().decode("utf-8"))
-                    if data.get("version") and data["version"] != CURRENT_VERSION:
+                    remote_version = data.get("version")
+                    if remote_version and parse_version(remote_version) > parse_version(CURRENT_VERSION):
                         self.update_data = data
 
                     notice = data.get("notice")
@@ -1115,10 +1232,13 @@ class ProximityApp(ctk.CTk):
                         state = load_local_state()
                         if state.get("last_seen_notice_id") != notice.get("id"):
                             self.pending_notice = notice
+
+                    merge_remote_changelog(data.get("changelog"))
             except Exception:
                 pass
             finally:
                 self.after(0, self._maybe_show_startup_popup)
+                self.after(0, self._refresh_patchnotes_badge)
         threading.Thread(target=fetch, daemon=True).start()
 
     def _maybe_show_startup_popup(self):
@@ -1539,6 +1659,10 @@ class ProximityApp(ctk.CTk):
         self.btn_settings = self._create_settings_button(self.main_container)
         self.btn_settings.place(relx=0.04, rely=0.03, anchor="nw")
 
+        self.btn_patchnotes = self._create_patchnotes_button(self.main_container)
+        self.btn_patchnotes.place(relx=0.04, rely=0.03, anchor="nw", x=40)
+        self._refresh_patchnotes_badge()
+
     def _sync_open_buttons(self):
         """Light up ↗ buttons for every toggle that is currently ON."""
         mapping = {
@@ -1686,6 +1810,79 @@ class ProximityApp(ctk.CTk):
 
         return frame
 
+    def _create_patchnotes_button(self, parent):
+        ICON_SIZE = 16
+        IDLE_BG    = "#12121e"
+
+        frame = ctk.CTkFrame(parent, width=34, height=24,
+                             fg_color=IDLE_BG, corner_radius=8,
+                             border_width=1, border_color=COLOR_BORDER,
+                             cursor="hand2")
+        frame.pack_propagate(False)
+
+        canvas = ctk.CTkCanvas(frame, width=ICON_SIZE, height=ICON_SIZE,
+                               bg=IDLE_BG, highlightthickness=0, cursor="hand2")
+        canvas.pack(expand=True)
+
+        def draw(color):
+            canvas.delete("all")
+            w, h = ICON_SIZE, ICON_SIZE
+            bx0, by0 = w * 0.14, h * 0.18
+            bx1, by1 = w * 0.86, h * 0.68
+            canvas.create_rectangle(bx0, by0, bx1, by1, outline=color, width=1.4)
+            tail_x = w * 0.30
+            canvas.create_line(tail_x, by1, tail_x - w * 0.10, by1 + h * 0.18,
+                               fill=color, width=1.4)
+            canvas.create_line(tail_x - w * 0.10, by1 + h * 0.18, tail_x + w * 0.12, by1,
+                               fill=color, width=1.4)
+            ly = by0 + (by1 - by0) * 0.36
+            canvas.create_line(bx0 + w * 0.10, ly, bx1 - w * 0.10, ly,
+                               fill=color, width=1.2)
+            ly2 = by0 + (by1 - by0) * 0.64
+            canvas.create_line(bx0 + w * 0.10, ly2, bx1 - w * 0.28, ly2,
+                               fill=color, width=1.2)
+
+        draw(COLOR_MAIN)
+
+        badge = ctk.CTkLabel(frame, text="1", width=14, height=14,
+                             fg_color=COLOR_ACCENT, text_color="#ffffff",
+                             font=(FONT_NAME, 8, "bold"), corner_radius=7)
+
+        def on_enter(_e=None):
+            frame.configure(border_color=COLOR_MAIN, fg_color=COLOR_SECONDARY)
+            canvas.configure(bg=COLOR_SECONDARY)
+            draw("#ffffff")
+
+        def on_leave(_e=None):
+            frame.configure(border_color=COLOR_BORDER, fg_color=IDLE_BG)
+            canvas.configure(bg=IDLE_BG)
+            draw(COLOR_MAIN)
+
+        def on_click(_e=None):
+            play_ui_sound("click")
+            w, h = WINDOW_SIZE_INSTALLER
+            self._animate_resize_to(w, h, on_done=self.show_patchnotes_screen)
+
+        for widget in (frame, canvas):
+            widget.bind("<Enter>", on_enter)
+            widget.bind("<Leave>", on_leave)
+            widget.bind("<Button-1>", on_click)
+
+        frame._patchnotes_badge = badge
+        return frame
+
+    def _refresh_patchnotes_badge(self):
+        btn = getattr(self, "btn_patchnotes", None)
+        if btn is None or not btn.winfo_exists():
+            return
+        badge = btn._patchnotes_badge
+        count = get_unread_patchnotes_count()
+        if count > 0:
+            badge.configure(text=str(count) if count < 10 else "9+")
+            badge.place(relx=1.0, rely=0.0, anchor="ne", x=3, y=-4)
+        else:
+            badge.place_forget()
+
     def show_settings_screen(self):
         lang = self.current_lang
         for w in self.main_container.winfo_children():
@@ -1822,6 +2019,130 @@ class ProximityApp(ctk.CTk):
             command=self._close_settings_screen
         )
         btn_close.place(relx=1.0, x=-16, rely=0.5, anchor="e")
+
+    def show_patchnotes_screen(self):
+        lang = self.current_lang
+        for w in self.main_container.winfo_children():
+            w.destroy()
+
+        mark_all_patchnotes_read()
+        self._refresh_patchnotes_badge()
+
+        top = ctk.CTkFrame(self.main_container, fg_color="transparent")
+        top.pack(fill="x", padx=20, pady=(18, 10))
+        ctk.CTkLabel(top, text=LOCALES[lang]["patchnotes_title"],
+                     font=(FONT_NAME, 20, "bold"), text_color=COLOR_MAIN, anchor="w"
+                     ).pack(side="left")
+        ctk.CTkLabel(top, text="PROXIMITY",
+                     font=(FONT_NAME, 10), text_color="#444455", anchor="e"
+                     ).pack(side="right")
+
+        body = ctk.CTkScrollableFrame(self.main_container, fg_color="transparent",
+                                      corner_radius=0, scrollbar_button_color="#2a2a35",
+                                      scrollbar_button_hover_color=COLOR_MAIN)
+        body.pack(fill="both", expand=True, padx=20, pady=(0, 12))
+
+        state = load_patchnotes_state()
+        messages = sorted(state["messages"], key=lambda m: m.get("_seq", 0))
+
+        if not messages:
+            empty_wrap = ctk.CTkFrame(body, fg_color="transparent")
+            empty_wrap.pack(fill="both", expand=True, pady=60)
+            ctk.CTkLabel(empty_wrap, text=LOCALES[lang]["patchnotes_empty"],
+                        font=(FONT_NAME, 12), text_color="#666677",
+                        justify="center").pack()
+        else:
+            for entry in messages:
+                self._render_patchnote_bubble(body, entry, lang)
+
+        footer = ctk.CTkFrame(self.main_container, fg_color="transparent", height=70)
+        footer.pack(fill="x", side="bottom", padx=20, pady=(0, 16))
+        footer.pack_propagate(False)
+
+        action_row = ctk.CTkFrame(footer, fg_color="transparent")
+        action_row.pack(fill="x", pady=(0, 10))
+
+        btn_issue = ctk.CTkButton(
+            action_row, text=LOCALES[lang]["patchnotes_issue"],
+            height=30, corner_radius=8,
+            fg_color="#1c1c26", border_width=1, border_color="#2e2e40",
+            hover_color="#242432", text_color="#d0d0e0", font=(FONT_NAME, 11, "bold"),
+            command=lambda: [play_ui_sound("click"), webbrowser.open("https://github.com/shprttx/Proximity/issues")]
+        )
+        btn_issue.pack(side="left", fill="x", expand=True, padx=(0, 6))
+
+        btn_donate = ctk.CTkButton(
+            action_row, text=LOCALES[lang]["patchnotes_donate"],
+            height=30, corner_radius=8,
+            fg_color="#12121e", border_width=1, border_color=COLOR_MAIN,
+            hover_color="#0b2e35", text_color=COLOR_MAIN, font=(FONT_NAME, 11, "bold"),
+            command=lambda: [play_ui_sound("click"), webbrowser.open("https://boosty.to/shprott/donate")]
+        )
+        btn_donate.pack(side="left", fill="x", expand=True, padx=(6, 0))
+
+        btn_close = ctk.CTkButton(
+            footer, text=LOCALES[lang]["patchnotes_close"],
+            height=28, corner_radius=3,
+            fg_color="#252530", border_width=1, border_color="#333344",
+            hover_color="#2e2e3d", text_color="#999aaa", font=(FONT_NAME, 11),
+            command=self._close_patchnotes_screen
+        )
+        btn_close.pack(fill="x")
+
+        body.update_idletasks()
+        body._parent_canvas.yview_moveto(1.0)
+
+    def _render_patchnote_bubble(self, parent, entry, lang):
+        mtype = entry.get("type", "info")
+        accent = PATCHNOTE_TYPE_COLORS.get(mtype, PATCHNOTE_TYPE_COLORS["info"])
+        icon = PATCHNOTE_TYPE_ICONS.get(mtype, PATCHNOTE_TYPE_ICONS["info"])
+        title = pick_localized(entry.get("title"), lang)
+        text = pick_localized(entry.get("text"), lang)
+        date = entry.get("date", "")
+
+        row = ctk.CTkFrame(parent, fg_color="transparent")
+        row.pack(fill="x", pady=(0, 14), anchor="w")
+
+        avatar = ctk.CTkFrame(row, width=32, height=32, fg_color="#0c0d14",
+                              corner_radius=16, border_width=1, border_color=accent)
+        avatar.pack(side="left", anchor="n")
+        avatar.pack_propagate(False)
+        ctk.CTkLabel(avatar, text=icon, font=(FONT_NAME, 13),
+                    text_color=accent).place(relx=0.5, rely=0.5, anchor="center")
+
+        msg_col = ctk.CTkFrame(row, fg_color="transparent")
+        msg_col.pack(side="left", anchor="n", padx=(8, 0))
+
+        tail = ctk.CTkCanvas(msg_col, width=8, height=8, bg="#0c0d14",
+                             highlightthickness=0)
+        tail.place(x=-2, y=8)
+        tail.create_polygon(8, 0, 8, 8, 0, 8, fill="#15151c", outline="#242432")
+
+        bubble = ctk.CTkFrame(msg_col, fg_color="#15151c", corner_radius=10,
+                              border_width=1, border_color="#242432")
+        bubble.pack(anchor="w")
+
+        content = ctk.CTkFrame(bubble, fg_color="transparent")
+        content.pack(fill="both", expand=True, padx=(12, 12), pady=(8, 9))
+
+        top_row = ctk.CTkFrame(content, fg_color="transparent")
+        top_row.pack(fill="x")
+        if title:
+            ctk.CTkLabel(top_row, text=title, font=("Segoe UI Emoji", 12, "bold"),
+                        text_color="#e8e8e8", anchor="w").pack(side="left")
+        if date:
+            ctk.CTkLabel(top_row, text=date, font=(FONT_NAME, 9),
+                        text_color="#5a5a6a", anchor="e").pack(side="left", padx=(10, 0))
+
+        if text:
+            ctk.CTkLabel(content, text=text, font=("Segoe UI Emoji", 11),
+                        text_color="#aaaabb", anchor="w", justify="left",
+                        wraplength=460).pack(fill="x", pady=(4, 0))
+
+    def _close_patchnotes_screen(self):
+        play_ui_sound("click")
+        w, h = WINDOW_SIZE_NORMAL
+        self._animate_resize_to(w, h, on_done=self.show_main_screen)
 
     def _save_setting(self, key, value):
         self.settings[key] = value
