@@ -23,6 +23,13 @@
 </div>
 
 
+<div align="center">
+	<br />
+	<p>
+		<img width="1248" height="832" alt="" src="main" />
+	</p>
+</div>
+
 
 
 ## 🚀 Что это
