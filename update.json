@@ -28,6 +28,19 @@
         "ru": "🔢 Proximity переходит на семантическое версионирование (SemVer)!\n\nВсе предыдущие релизы, включая текущий, уже обновлены на GitHub. Следующее обновление принесёт новую систему версионирования непосредственно в код приложения.\n\n✨ Что это даст?\n\n📌 Понятность масштаба изменений для пользователя. По номеру версии можно будет визуально оценить важность обновления: исправления ошибок, новые функции или значительные изменения.\n\n🧩 Единый стандарт. Версии станут понятнее и удобнее для сравнения.\n\n🚀 Теперь следить за развитием Proximity станет проще - номер версии будет помогать ориентироваться в характере изменений.\n\nСпасибо, что пользуетесь Proximity!",
         "en": "🔢 Proximity is switching to Semantic Versioning (SemVer)!\n\nAll previous releases, including the current one, have already been updated on GitHub. The next update will introduce the new versioning system directly into the application code.\n\n✨ What does this mean for you?\n\n📌 Clearer understanding of the scale of changes. The version number will help users visually assess the scope of an update: bug fixes, new features, or major changes.\n\n🧩 A unified standard. Versions will become easier to understand and compare.\n\n🚀 Following Proximity's development will be easier - version numbers will help users understand the nature of changes.\n\nThank you for using Proximity!"
      }
+    },
+    {
+      "id": "2026-10-07!mess",
+      "date": "2026-10-07",
+      "type": "info",
+      "title": {
+        "ru": "Небольшое сообщение от автора",
+        "en": "A Small Message from the Creator"
+      },
+      "text": {
+        "ru": "Всем привет. Простите, что в последнее время я не выпускаю обновления для утилит.\n\nСейчас я не очень хорошо себя чувствую и физически, и морально. Уже несколько дней я занимаюсь подготовкой отдельного алгоритма обновления утилит, который будет работать независимо от основного приложения.\n\nЯ делаю обновления один, параллельно учусь, и, если честно, в последнее время немного не справляюсь со всем сразу. Иногда просто не хватает сил и времени, поэтому всё движется медленнее, чем мне хотелось бы.\n\nНо я не забросил проект. Обещаю, что новая версия выйдет либо уже сегодня ночью, либо завтра в течение дня.\n\nСпасибо за терпение и понимание. ❤️",
+        "en": "Hi everyone. I'm sorry that I haven't been releasing updates for the utilities lately.\n\nI'm not feeling very well right now both physically and mentally. For the past few days, I've been working on a separate update system for the utilities that will work independently from the main application.\n\nI'm developing the updates on my own while studying at the same time, and honestly, lately I'm having a hard time keeping up with everything. Sometimes I simply don't have enough energy or time, so things are moving slower than I'd like.\n\nBut I haven't abandoned the project. I promise that the new version will be released either tonight or sometime tomorrow.\n\nThank you for your patience and understanding. ❤️"
+      }
     }
   ]
 }
