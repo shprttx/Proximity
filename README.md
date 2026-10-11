@@ -26,7 +26,7 @@
 <div align="center">
 	<br />
 	<p>
-		<img width="1248" height="832" alt="" src="main" />
+		<img width="1248" height="832" alt="" src="Images/main" />	
 	</p>
 </div>
 
@@ -57,8 +57,8 @@
 <div align="center">
 <table>
 <tr>
-<td width="50%"><img src="VMAIN.png" alt="" width="100%"></td>
-<td width="50%"><img src="TRAY.png" alt="" width="100%"></td>
+<td width="50%"><img src="Images/VMAIN.png" alt="" width="100%"></td>
+<td width="50%"><img src="Images/TRAY.png" alt="" width="100%"></td>
 </tr>
 </table>
 </div>
@@ -94,7 +94,7 @@
 Выберите нужный движок, и он запустится в CMD-консоли.
 
 <div align="center">
-<img src="CH.png" alt="" width="50%">
+<img src="Images/CH.png" alt="" width="50%">
 </div>
 
 </details>
@@ -116,7 +116,7 @@
 <div align="center">
 <table>
 <tr>
-<td width="50%"><img src="WIZZ.png" alt="" width="90%"></td>
+<td width="50%"><img src="Images/WIZZ.png" alt="" width="90%"></td>
 </tr>
 </table>
 </div>
@@ -138,7 +138,7 @@
 <div align="center">
 <table>
 <tr>
-<td width="50%"><img src="SETT.png" alt="" width="90%"></td>
+<td width="50%"><img src="Images/SETT.png" alt="" width="90%"></td>
 </tr>
 </table>
 </div>
