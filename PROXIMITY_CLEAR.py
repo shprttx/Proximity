@@ -14,25 +14,30 @@ import socket
 import winreg
 import hashlib
 import datetime
+import zipfile
+import shutil
 import customtkinter as ctk
 from PIL import Image
 import pystray
 import psutil
 
 
-CURRENT_VERSION = "27.09.26"
-UPDATE_URL      = "https://raw.githubusercontent.com/shprttx/Proximity/main/update.json"
+CURRENT_VERSION = "1.12.0"
+
+BUNDLED_ENGINE_VERSIONS = {
+    "tg":     "1.11.1",
+    "zprtx":  "1.0.1",
+    "zapret": "1.10.3",
+}
+UPDATE_URL     = "https://raw.githubusercontent.com/shprttx/Proximity/main/update.json"
+DONATE_URL     = "https://github.com/shprttx/Proximity/blob/main/supp.png"
 
 
 def parse_version(v):
-    """
-    Parses a version string in "DD.MM.YY" format into a comparable
-    (year, month, day) tuple. Falls back to (0, 0, 0) on any malformed
-    input so a bad/missing remote value never wins a comparison.
-    """
     try:
-        d, m, y = str(v).strip().split(".")
-        return (int(y), int(m), int(d))
+        parts = str(v).strip().split(".")
+        parts = (parts + ["0", "0", "0"])[:3]
+        return tuple(int(p) for p in parts)
     except Exception:
         return (0, 0, 0)
 
@@ -90,6 +95,73 @@ def save_local_state(data):
             json.dump(data, f, ensure_ascii=False)
     except Exception:
         pass
+
+def get_engine_versions():
+    state = load_local_state()
+    versions = state.get("engine_versions")
+    return versions if isinstance(versions, dict) else {}
+
+def save_engine_version(engine_key, version, target=None):
+    state = load_local_state()
+    versions = state.get("engine_versions")
+    if not isinstance(versions, dict):
+        versions = {}
+    versions[engine_key] = version
+    state["engine_versions"] = versions
+    if target:
+        targets = state.get("engine_targets")
+        if not isinstance(targets, dict):
+            targets = {}
+        targets[engine_key] = target
+        state["engine_targets"] = targets
+    save_local_state(state)
+
+def reconcile_engine_overrides():
+    state = load_local_state()
+    versions = state.get("engine_versions")
+    targets = state.get("engine_targets")
+    if not isinstance(versions, dict) or not isinstance(targets, dict):
+        return
+    changed = False
+    for key, bundled in BUNDLED_ENGINE_VERSIONS.items():
+        recorded = versions.get(key)
+        if recorded and parse_version(bundled) >= parse_version(recorded):
+            sub = targets.get(key)
+            if sub:
+                shutil.rmtree(os.path.join(ENGINES_DIR, sub), ignore_errors=True)
+            versions.pop(key, None)
+            targets.pop(key, None)
+            changed = True
+    if changed:
+        state["engine_versions"] = versions
+        state["engine_targets"] = targets
+        save_local_state(state)
+
+def diff_engine_updates(remote_engines):
+    if not isinstance(remote_engines, dict):
+        return []
+    local = get_engine_versions()
+    pending = []
+    for key, info in remote_engines.items():
+        if not isinstance(info, dict):
+            continue
+        remote_v = info.get("version", "")
+        if not remote_v:
+            continue
+        local_v = local.get(key) or BUNDLED_ENGINE_VERSIONS.get(key)
+        if local_v is None:
+            save_engine_version(key, remote_v)
+            continue
+        if parse_version(remote_v) > parse_version(local_v):
+            pending.append({
+                "key":     key,
+                "name":    info.get("name", key),
+                "version": remote_v,
+                "url":     info.get("url", ""),
+                "sha256":  info.get("sha256", ""),
+                "target":  info.get("target", ""),
+            })
+    return pending
 
 def pick_localized(value, lang):
     if isinstance(value, dict):
@@ -245,8 +317,20 @@ if load_local_state().get("autostart", True):
     _ensure_autostart()
 
 TOOLS_DIR        = resource_path("Tools")
+ENGINES_DIR      = os.path.join(get_state_dir(), "engines")
 CREATE_NO_WINDOW = 0x08000000
 ICON_PATH        = os.path.join(TOOLS_DIR, "Proximity.ico")
+
+def engine_dir(sub, bundled=None):
+    override = os.path.join(ENGINES_DIR, sub)
+    try:
+        if os.path.isdir(override) and os.listdir(override):
+            return override
+    except OSError:
+        pass
+    return os.path.join(TOOLS_DIR, bundled or sub)
+
+reconcile_engine_overrides()
 
 SERVICE_PROCESS_NAMES = {
     "happ":  ("happ.exe",),
@@ -364,6 +448,11 @@ LOCALES = {
         "patchnotes_empty":   "No updates yet.\nWe'll post news about engine\nupdates and features here.",
         "patchnotes_issue":   "SOMETHING'S NOT WORKING",
         "patchnotes_donate":  "SUPPORT THE AUTHOR",
+        "eng_upd_title":       "TOOLS UPDATE",
+        "eng_upd_msg":         "New versions of built-in tools are available. Update them to keep everything running smoothly.",
+        "eng_upd_btn":         "UPDATE NOW",
+        "eng_upd_later":       "Later",
+        "eng_upd_downloading": "Downloading...",
     },
     "RU": {
         "lang_btn":        "EN",
@@ -433,6 +522,11 @@ LOCALES = {
         "patchnotes_empty":   "Пока нет обновлений.\nЗдесь будут новости об апдейтах\nи новых функциях.",
         "patchnotes_issue":   "ЧТО ТО НЕ РАБОТАЕТ",
         "patchnotes_donate":  "ПОДДЕРЖАТЬ АВТОРА",
+        "eng_upd_title":       "ОБНОВЛЕНИЕ УТИЛИТ",
+        "eng_upd_msg":         "Доступны новые версии встроенных утилит. Обновите их, чтобы всё работало стабильно.",
+        "eng_upd_btn":         "ОБНОВИТЬ СЕЙЧАС",
+        "eng_upd_later":       "Позже",
+        "eng_upd_downloading": "Загрузка...",
     },
 }
 
@@ -746,6 +840,144 @@ class UpdateNotificationWindow(ctk.CTkToplevel):
             return False
 
 
+class EngineUpdateWindow(ctk.CTkToplevel):
+    def __init__(self, parent, lang, engines):
+        super().__init__(parent)
+        self.title(LOCALES[lang]["eng_upd_title"])
+
+        WIN_W, WIN_H = 380, 320
+        self.geometry(f"{WIN_W}x{WIN_H}")
+        self.configure(fg_color=COLOR_BG)
+        self.resizable(False, False)
+        self.transient(parent)
+        self.grab_set()
+        self.attributes("-alpha", 0.0)
+
+        self.update_idletasks()
+        x = parent.winfo_rootx() + (parent.winfo_width()  - WIN_W) // 2
+        y = parent.winfo_rooty() + (parent.winfo_height() - WIN_H) // 2
+        self.geometry(f"+{x}+{y}")
+
+        if os.path.exists(ICON_PATH):
+            self.after(200, lambda: self.iconbitmap(ICON_PATH))
+
+        content = ctk.CTkFrame(self, fg_color=COLOR_FRAME, corner_radius=16,
+                               border_color=COLOR_MAIN, border_width=2)
+        content.pack(fill="both", expand=True, padx=12, pady=12)
+
+        ctk.CTkLabel(content, text=LOCALES[lang]["eng_upd_title"],
+                     font=(FONT_NAME, 17, "bold"), text_color=COLOR_MAIN
+                     ).pack(pady=(16, 4))
+
+        ctk.CTkLabel(content, text=LOCALES[lang]["eng_upd_msg"],
+                     font=(FONT_NAME, 12), justify="center", text_color="#cccccc",
+                     wraplength=300
+                     ).pack(pady=(0, 10))
+
+        list_frame = ctk.CTkFrame(content, fg_color="#12121e", corner_radius=10)
+        list_frame.pack(fill="x", padx=24, pady=(0, 14))
+        for engine in engines:
+            row = ctk.CTkFrame(list_frame, fg_color="transparent")
+            row.pack(fill="x", padx=12, pady=6)
+            ctk.CTkLabel(row, text=engine["name"], font=(FONT_NAME, 12, "bold"),
+                        text_color="#e8e8e8", anchor="w").pack(side="left")
+            ctk.CTkLabel(row, text=f"v{engine['version']}", font=(FONT_NAME, 11),
+                        text_color=COLOR_MAIN, anchor="e").pack(side="right")
+
+        btn_update = ctk.CTkButton(
+            content, text=LOCALES[lang]["eng_upd_btn"],
+            fg_color="transparent", border_width=2, border_color=COLOR_MAIN,
+            hover_color="#0b2e35", corner_radius=10, text_color=COLOR_MAIN,
+            font=(FONT_NAME, 12, "bold"), height=34,
+            command=lambda: [play_ui_sound("click"), self.destroy(), parent._launch_engine_updates(engines)]
+        )
+        btn_update.bind("<Enter>", lambda e: btn_update.configure(text_color="#ffffff"))
+        btn_update.bind("<Leave>", lambda e: btn_update.configure(text_color=COLOR_MAIN))
+        btn_update.pack(pady=(0, 8), fill="x", padx=30)
+
+        btn_later = ctk.CTkButton(
+            content, text=LOCALES[lang]["eng_upd_later"],
+            fg_color="#12121e", border_width=1, border_color=COLOR_BORDER,
+            hover_color=COLOR_SECONDARY, corner_radius=10, text_color="#999aaa",
+            font=(FONT_NAME, 11), height=30,
+            command=lambda: [play_ui_sound("click"), self.destroy()]
+        )
+        btn_later.pack(pady=(0, 2), fill="x", padx=30)
+
+        self.after(80, self._fade_in)
+
+    def _fade_in(self, alpha=0.0):
+        alpha = min(alpha + 0.07, 1.0)
+        try:
+            self.attributes("-alpha", alpha)
+        except Exception:
+            return
+        if alpha < 1.0:
+            self.after(14, lambda: self._fade_in(alpha))
+
+
+class EngineUpdateProgressWindow(ctk.CTkToplevel):
+    def __init__(self, parent, lang, engines):
+        super().__init__(parent)
+        self._lang = lang
+        self.title(LOCALES[lang]["eng_upd_title"])
+        WIN_W, WIN_H = 360, 190
+        self.geometry(f"{WIN_W}x{WIN_H}")
+        self.configure(fg_color=COLOR_BG)
+        self.resizable(False, False)
+        self.transient(parent)
+        self.grab_set()
+        self.protocol("WM_DELETE_WINDOW", lambda: None)
+
+        self.update_idletasks()
+        x = parent.winfo_rootx() + (parent.winfo_width()  - WIN_W) // 2
+        y = parent.winfo_rooty() + (parent.winfo_height() - WIN_H) // 2
+        self.geometry(f"+{x}+{y}")
+
+        if os.path.exists(ICON_PATH):
+            self.after(200, lambda: self.iconbitmap(ICON_PATH))
+
+        frame = ctk.CTkFrame(self, fg_color=COLOR_FRAME, corner_radius=16,
+                             border_color=COLOR_MAIN, border_width=2)
+        frame.pack(fill="both", expand=True, padx=12, pady=12)
+
+        ctk.CTkLabel(frame, text=LOCALES[lang]["eng_upd_title"],
+                     font=(FONT_NAME, 15, "bold"), text_color=COLOR_MAIN
+                     ).pack(pady=(18, 10))
+
+        self._status_label = ctk.CTkLabel(
+            frame, text=LOCALES[lang]["eng_upd_downloading"],
+            font=(FONT_NAME, 12), text_color="#cccccc")
+        self._status_label.pack(pady=(0, 14))
+
+        self._bar = ctk.CTkProgressBar(frame, progress_color=COLOR_MAIN,
+                                       fg_color="#12121e", height=14, corner_radius=7,
+                                       mode="indeterminate")
+        self._bar.pack(fill="x", padx=30)
+        self._bar.start()
+
+    def set_status(self, index, total, name):
+        try:
+            self._status_label.configure(
+                text=f"{LOCALES[self._lang]['eng_upd_downloading']} ({index+1}/{total}) — {name}")
+        except Exception:
+            pass
+
+    def finish(self, success):
+        try:
+            self._bar.stop()
+        except Exception:
+            pass
+        try:
+            self.destroy()
+        except Exception:
+            pass
+        if success:
+            play_ui_sound("click")
+        else:
+            play_ui_sound("warning")
+
+
 class NoticeWindow(ctk.CTkToplevel):
     def __init__(self, parent, lang, notice_data, on_dismiss=None, on_close_show_next=None):
         super().__init__(parent)
@@ -981,7 +1213,7 @@ class ZprtxLauncherWindow(ctk.CTkToplevel):
         if os.path.exists(ICON_PATH):
             self.after(200, lambda: self.iconbitmap(ICON_PATH))
 
-        self._resolved   = False  
+        self._resolved   = False
         self._shimmering = True
         self.protocol("WM_DELETE_WINDOW", lambda: self._on_close(callback_cancel))
 
@@ -1151,7 +1383,6 @@ class SimpleInfoWindow(ctk.CTkToplevel):
 
 class ProximityApp(ctk.CTk):
 
-
     def __init__(self):
         super().__init__()
         self.current_lang = "RU"
@@ -1182,7 +1413,9 @@ class ProximityApp(ctk.CTk):
         self.tray_icon      = None
         self.update_data    = None
         self.pending_notice = None
+        self.pending_engine_updates = []
         self._auto_update_win = None
+        self._engine_update_win = None
         self._popup_shown   = False
         self._ready_for_popup = False
         self._zprtx_proc    = None
@@ -1223,7 +1456,7 @@ class ProximityApp(ctk.CTk):
                 req = urllib.request.Request(UPDATE_URL, headers={"User-Agent": "Mozilla/5.0"})
                 with urllib.request.urlopen(req, timeout=8) as r:
                     data = json.loads(r.read().decode("utf-8"))
-                    remote_version = data.get("version")
+                    remote_version = data.get("app_version")
                     if remote_version and parse_version(remote_version) > parse_version(CURRENT_VERSION):
                         self.update_data = data
 
@@ -1234,6 +1467,8 @@ class ProximityApp(ctk.CTk):
                             self.pending_notice = notice
 
                     merge_remote_changelog(data.get("changelog"))
+
+                    self.pending_engine_updates = diff_engine_updates(data.get("engines"))
             except Exception:
                 pass
             finally:
@@ -1246,7 +1481,7 @@ class ProximityApp(ctk.CTk):
             return
         if not self._ready_for_popup:
             return
-        if not (self.pending_notice or self.update_data):
+        if not (self.pending_notice or self.update_data or self.pending_engine_updates):
             return
 
         if self.tray_icon is not None or self.state() != "normal":
@@ -1257,14 +1492,19 @@ class ProximityApp(ctk.CTk):
             self._popup_shown = True
             NoticeWindow(self, self.current_lang, self.pending_notice,
                         on_dismiss=self._mark_notice_seen,
-                        on_close_show_next=self._show_update_after_notice if self.update_data else None)
+                        on_close_show_next=self._show_next_popup if (self.update_data or self.pending_engine_updates) else None)
         elif self.update_data:
             self._popup_shown = True
             UpdateNotificationWindow(self, self.current_lang, self.update_data)
+        elif self.pending_engine_updates:
+            self._popup_shown = True
+            EngineUpdateWindow(self, self.current_lang, self.pending_engine_updates)
 
-    def _show_update_after_notice(self):
+    def _show_next_popup(self):
         if self.update_data:
             UpdateNotificationWindow(self, self.current_lang, self.update_data)
+        elif self.pending_engine_updates:
+            EngineUpdateWindow(self, self.current_lang, self.pending_engine_updates)
 
     def _mark_notice_seen(self):
         notice = self.pending_notice
@@ -1408,6 +1648,99 @@ class ProximityApp(ctk.CTk):
                          LOCALES[self.current_lang]["upd_auto_error"],
                          accent=COLOR_ACCENT)
 
+    def _launch_engine_updates(self, engines):
+        self._engine_update_win = EngineUpdateProgressWindow(self, self.current_lang, engines)
+        threading.Thread(target=self._engine_update_worker, args=(engines,), daemon=True).start()
+
+    def _stop_engine_for_update(self, key):
+        if key == "tg":
+            subprocess.run("taskkill /IM TgWsProxy_windows.exe /F", shell=True,
+                           creationflags=CREATE_NO_WINDOW,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        elif key in ("zprtx", "zapret"):
+            self._stop_zprtx()
+
+    def _install_engine(self, engine):
+        url = engine.get("url", "")
+        expected = (engine.get("sha256") or "").strip().lower()
+        if not url or not expected:
+            return False
+
+        temp_dir = os.path.join(os.environ.get("TEMP") or tempfile.gettempdir(), "Proximity_engine_update")
+        os.makedirs(temp_dir, exist_ok=True)
+        archive_path = os.path.join(temp_dir, f"{engine['key']}.zip")
+
+        target_sub = engine.get("target") or engine["key"]
+        target_dir = os.path.join(ENGINES_DIR, target_sub)
+        staging    = target_dir + "_new"
+
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                with open(archive_path, "wb") as f:
+                    while True:
+                        chunk = resp.read(262144)
+                        if not chunk:
+                            break
+                        f.write(chunk)
+
+            digest = hashlib.sha256()
+            with open(archive_path, "rb") as f:
+                for chunk in iter(lambda: f.read(1048576), b""):
+                    digest.update(chunk)
+            if digest.hexdigest().lower() != expected:
+                return False
+
+            shutil.rmtree(staging, ignore_errors=True)
+            os.makedirs(staging, exist_ok=True)
+            with zipfile.ZipFile(archive_path, "r") as zf:
+                zf.extractall(staging)
+
+            self._stop_engine_for_update(engine["key"])
+            shutil.rmtree(target_dir, ignore_errors=True)
+            os.replace(staging, target_dir)
+
+            save_engine_version(engine["key"], engine["version"], target=target_sub)
+            return True
+        except Exception:
+            return False
+        finally:
+            shutil.rmtree(staging, ignore_errors=True)
+            try:
+                os.remove(archive_path)
+            except OSError:
+                pass
+
+    def _engine_update_worker(self, engines):
+        total = len(engines)
+        updated = []
+        failed = False
+        try:
+            for idx, engine in enumerate(engines):
+                self.after(0, lambda i=idx, e=engine: self._engine_update_status(i, total, e["name"]))
+                if self._install_engine(engine):
+                    updated.append(engine["key"])
+                else:
+                    failed = True
+        except Exception:
+            failed = True
+        self.after(0, lambda: self._engine_update_finished(not failed, updated))
+
+    def _engine_update_status(self, index, total, name):
+        if self._engine_update_win is not None:
+            self._engine_update_win.set_status(index, total, name)
+
+    def _engine_update_finished(self, success, updated=()):
+        self.pending_engine_updates = []
+        switch_for = {"tg": "tg", "zprtx": "zprtx", "zapret": "zprtx"}
+        vars_by_key = {"tg": self.var_tg, "zprtx": self.var_zprtx}
+        for key in updated:
+            ui_key = switch_for.get(key)
+            if ui_key and vars_by_key[ui_key].get() == "on":
+                self._panic_mark_off(ui_key)
+        if self._engine_update_win is not None:
+            self._engine_update_win.finish(success)
+            self._engine_update_win = None
 
     def _show_splash(self):
         W, H = 480, 300
@@ -1610,7 +1943,6 @@ class ProximityApp(ctk.CTk):
         self._populate_main_screen()
 
     def _populate_main_screen(self):
-        """Fill main_container with the home screen widgets."""
         for w in self.main_container.winfo_children():
             w.destroy()
 
@@ -1633,7 +1965,7 @@ class ProximityApp(ctk.CTk):
         self.sw_zprtx_widget = self._create_switch(scroll_frame, LOCALES[self.current_lang]["sw_zprtx"], self.toggle_zprtx, self.var_zprtx, "info_zprtx", "zprtx")
         self.sw_warp_widget  = self._create_switch(scroll_frame, LOCALES[self.current_lang]["sw_warp"],  self.toggle_warp,  self.var_warp,  "info_warp",  "warp")
 
-        
+
         self._sync_open_buttons()
 
         self.btn_installer = self._create_button(self.main_container, LOCALES[self.current_lang]["btn_installer"], self.open_installer_window, is_accent=True, sound=None)
@@ -1664,7 +1996,6 @@ class ProximityApp(ctk.CTk):
         self._refresh_patchnotes_badge()
 
     def _sync_open_buttons(self):
-        """Light up ↗ buttons for every toggle that is currently ON."""
         mapping = {
             "happ":  self.var_happ,
             "tg":    self.var_tg,
@@ -1686,7 +2017,7 @@ class ProximityApp(ctk.CTk):
         token = self.header
         def tick():
             if self.header is not token:
-                return 
+                return
             try:
                 self.header.configure(text_color=PULSE_COLORS[self.pulse_step])
                 self.pulse_step = (self.pulse_step + 1) % len(PULSE_COLORS)
@@ -1697,10 +2028,6 @@ class ProximityApp(ctk.CTk):
 
 
     def _create_panic_button(self, parent):
-        """Vector-drawn power-button icon (arc + stem, no image asset), sized
-        to match the EN/RU language button exactly. Clicking it instantly
-        kills all 4 services -- no confirmation dialog, deliberately separate
-        from the normal on_closing() warning flow."""
         ICON_SIZE = 16
         IDLE_BG    = "#12121e"
 
@@ -1987,7 +2314,7 @@ class ProximityApp(ctk.CTk):
                     sep_line = ctk.CTkFrame(card, fg_color="#242432", height=1)
                     sep_line.pack(fill="x")
 
-        
+
         make_section_label(body, LOCALES[lang]["settings_section_app"])
         make_group(body, [
             (LOCALES[lang]["settings_autostart"],       self.var_autostart,     self.toggle_autostart,       None),
@@ -1995,7 +2322,7 @@ class ProximityApp(ctk.CTk):
             (LOCALES[lang]["settings_confirm_close"],   self.var_confirm_close, self.toggle_confirm_close,   None),
         ])
 
-        
+
         make_section_label(body, LOCALES[lang]["settings_section_auto"],
                            subtitle=LOCALES[lang]["settings_section_auto_sub"])
         make_group(body, [
@@ -2010,6 +2337,10 @@ class ProximityApp(ctk.CTk):
         footer = ctk.CTkFrame(self.main_container, fg_color="#161618", corner_radius=0, height=44)
         footer.pack(fill="x", side="bottom")
         footer.pack_propagate(False)
+
+        ctk.CTkLabel(footer, text=f"Proximity v{CURRENT_VERSION}",
+                     font=(FONT_NAME, 11), text_color="#666677", anchor="w"
+                     ).place(x=16, rely=0.5, anchor="w")
 
         btn_close = ctk.CTkButton(
             footer, text=LOCALES[lang]["settings_close"],
@@ -2076,7 +2407,7 @@ class ProximityApp(ctk.CTk):
             height=30, corner_radius=8,
             fg_color="#12121e", border_width=1, border_color=COLOR_MAIN,
             hover_color="#0b2e35", text_color=COLOR_MAIN, font=(FONT_NAME, 11, "bold"),
-            command=lambda: [play_ui_sound("click"), webbrowser.open("https://boosty.to/shprott/donate")]
+            command=lambda: [play_ui_sound("click"), webbrowser.open(DONATE_URL)]
         )
         btn_donate.pack(side="left", fill="x", expand=True, padx=(6, 0))
 
@@ -2518,7 +2849,7 @@ class ProximityApp(ctk.CTk):
             if isinstance(w, ctk.CTkToplevel):
                 w.grab_release()
                 w.destroy()
-       
+
         self._sync_open_buttons()
 
     def _force_close(self):
@@ -2599,10 +2930,6 @@ class ProximityApp(ctk.CTk):
         self._installer_right_widgets = {"placeholder": placeholder, "panel": None}
 
         def render_details(key, title, info_text, install_cb):
-            """Fills the right-hand panel with the chosen tool's info +
-            an Install button. Rebuilds it fresh each time a different
-            entry is clicked, same destroy-and-recreate pattern already
-            used for the rest of the screens in this app."""
             self._installer_selected_key = key
             for w in right.winfo_children():
                 w.destroy()
@@ -2793,7 +3120,7 @@ class ProximityApp(ctk.CTk):
             subprocess.run("taskkill /IM Happ.exe /F", shell=True, creationflags=CREATE_NO_WINDOW)
 
     def toggle_tg(self, var):
-        t_path = os.path.join(TOOLS_DIR, "TG", "TgWsProxy_windows.exe")
+        t_path = os.path.join(engine_dir("TG"), "TgWsProxy_windows.exe")
         if var.get() == "on":
             self.open_buttons["tg"].configure(state="normal", fg_color=COLOR_MAIN,
                                               border_color=COLOR_MAIN, text_color="#000000")
@@ -2811,7 +3138,7 @@ class ProximityApp(ctk.CTk):
                            shell=True, creationflags=CREATE_NO_WINDOW)
 
     def _start_zprtx(self):
-        z_dir    = os.path.abspath(os.path.join(TOOLS_DIR, "Zprtx"))
+        z_dir    = os.path.abspath(engine_dir("Zprtx"))
         full_bat = os.path.join(z_dir, "MAIN.bat")
         if not os.path.exists(full_bat):
             return False
@@ -2827,7 +3154,7 @@ class ProximityApp(ctk.CTk):
             return False
 
     def _start_zapret(self):
-        z_dir    = os.path.abspath(os.path.join(TOOLS_DIR, "zapret_1.10.1"))
+        z_dir    = os.path.abspath(engine_dir("zapret", bundled="zapret_1.10.3"))
         full_bat = os.path.join(z_dir, "service.bat")
         if not os.path.exists(full_bat):
             return False
