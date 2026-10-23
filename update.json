@@ -32,9 +32,9 @@
     },
     "zapret": {
       "name": "ZAPRET",
-      "version": "1.10.3",
-      "url": "https://raw.githubusercontent.com/shprttx/Proximity/main/engines/ZAPRET_1.10.3.zip",
-      "sha256": "383a0168ad36cf4c70022a39031f40871bebe07caf4a5c5cf7aea22a634fea67",
+      "version": "1.10.4",
+      "url": "https://raw.githubusercontent.com/shprttx/Proximity/main/engines/ZAPRET_1.10.4.zip",
+      "sha256": "1F88E41FA546DB8CFCBE380A09CFA6A82323551D0D4240C245A4F1A04A4D4FEC",
       "target": "zapret"
     }
   },
