@@ -1,9 +1,9 @@
 {
   "version": "08.10.26",
-  "app_version": "1.12.0",
-  "release_url": "https://github.com/shprttx/Proximity/releases/tag/1.12.0",
-  "download_url": "https://github.com/shprttx/Proximity/releases/download/1.12.0/Proximity.exe",
-  "sha256": "630ecc4955d6d2acdfbcadde97159a88b1f68f6840c33a27482a690273e12072",
+  "app_version": "1.12.1",
+  "release_url": "https://github.com/shprttx/Proximity/releases/tag/1.12.1",
+  "download_url": "https://github.com/shprttx/Proximity/releases/download/1.12.1/Proximity.exe",
+  "sha256": "753FA76D8B525946B00C043E09572886A68E2D9280282F738C01F745FE9BBFEE",
   "notice": {
     "id": "",
     "title": {
