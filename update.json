@@ -90,6 +90,19 @@
         "ru": "🍁 Добро пожаловать в версию 1.12.0! 🍁\n\nВ этом обновлении Proximity получила новую систему обновления утилит. TG Proxy обновлён до 1.11.1, ZAPRET до 1.10.3, ZPRTX до 1.0.1.\n\nТеперь утилиты обновляются отдельно от основного приложения, поэтому для их обновления больше не требуется пересборка Proximity.\n\nТакже приложение перешло на новую систему семантического версионирования (SemVer), а текущая версия Proximity теперь отображается в нижней части настроек.",
         "en": "🍁 Welcome to version 1.12.0! 🍁\n\nThis update introduces a new utility update system in Proximity. TG Proxy has been updated to 1.11.1, ZAPRET to 1.10.3, and ZPRTX to 1.0.1.\n\nUtilities can now be updated separately from the main application, so updating them no longer requires rebuilding Proximity.\n\nThe application has also moved to a new Semantic Versioning (SemVer) system, and the current Proximity version is now displayed at the bottom of Settings."
       }
-    }
+    },
+      {
+      "id": "2026-11-20!tg-proxy-fix",
+      "date": "2026-11-20",
+      "type": "security",
+      "title": {
+        "ru": "⚠️ Проблемы в работе TG Proxy",
+        "en": "⚠️ TG Proxy Connection Issues"
+      },
+      "text": {
+        "ru": "⚠️ Внимание! Если у вас перестал работать TG Proxy:\n\nПопробуйте отключить параметр «TLS для CF-прокси и CF-worker» в настройках прокси - многим пользователям это уже помогло восстановить соединение.\n\n💬 Обсуждение и помощь на форуме АВТОРА:\nGitHub:\nhttps://github.com/Flowseal/tg-ws-proxy/issues/1668",
+        "en": "⚠️ Attention! If TG Proxy has stopped working for you:\n\nTry disabling the \"TLS for CF-proxy and CF-worker\" option in your proxy settings - this has already helped many users restore their connection.\n\n💬 Discussion and help on the GitHub forum:\nhttps://github.com/Flowseal/tg-ws-proxy/issues/1668"
+      }
+        }
   ]
 }
