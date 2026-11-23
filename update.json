@@ -104,18 +104,18 @@
         "en": "⚠️ Attention! If TG Proxy has stopped working for you:\n\nTry disabling the \"TLS for CF-proxy and CF-worker\" option in your proxy settings - this has already helped many users restore their connection.\n\n💬 Discussion and help on the GitHub forum:\nhttps://github.com/Flowseal/tg-ws-proxy/issues/1668"
       }
         },
-      {
-    "id": "2026-11-23-update-guide",
-    "date": "2026-11-23",
-    "type": "info",
-    "title": {
-      "ru": "Баг обновления утилит?",
-      "en": "Utility Update Bug?"
-    },
-    "text": {
-      "ru": "Всем привет\n\nЗаметил, что у некоторых пользователей возникают трудности с обновлением утилит с GitHub. Если у вас не скачивается апдейт, есть два простых решения:\n\n1️⃣ Отключите автозагрузку нужной утилиты. Переведите её ползунок в неактивное положение, полностью перезапустите Proximity и попробуйте обновиться снова. Это помогает в большинстве случаев.\n\n2️⃣ Если первый способ не сработал значит, серверы GitHub ещё не успели обработать свежие файлы релизов, и приложение временно не может их загрузить. Я стараюсь выпускать апдейты день в день, поэтому просто подождите пару часов и повторите шаг 1.\n\n🐞 Если у вас остались вопросы или вы столкнулись с багами, обязательно пишите сюда: https://github.com/shprttx/Proximity/issues\n\nСпасибо, что пользуетесь Proximity!",
-      "en": "Hello everyone\n\nI noticed that some users are having trouble updating utilities from GitHub. If an update fails to download, here are two simple solutions:\n\n1️⃣ Disable autostart for the utility you want to update. Toggle its autostart switch off, completely restart Proximity, and try updating again. This resolves the issue in most cases.\n\n2️⃣ If the first method didn't work, GitHub servers haven't finished processing the newly uploaded release files yet, so the app temporarily can't fetch them. I try to release updates on the same day, so just wait a couple of hours and repeat step 1.\n\n🐞 If you still have questions or encounter any bugs, please report them here: https://github.com/shprttx/Proximity/issues\n\nThank you for using Proximity!"
+{
+      "id": "2026-11-23!bagreport",
+      "date": "2026-11-23",
+      "type": "info",
+      "title": {
+        "ru": "Баг обновления утилит?",
+        "en": "Utility Update Bug?"
+      },
+      "text": {
+        "ru": "Всем привет\n\nЗаметил, что у некоторых пользователей возникают трудности с обновлением утилит с GitHub. Если у вас не скачивается апдейт, есть два простых решения:\n\n1️⃣ Отключите автозагрузку нужной утилиты. Переведите её ползунок в неактивное положение, полностью перезапустите Proximity и попробуйте обновиться снова. Это помогает в большинстве случаев.\n\n2️⃣ Если первый способ не сработал значит, серверы GitHub ещё не успели обработать свежие файлы релизов, и приложение временно не может их загрузить. Я стараюсь выпускать апдейты день в день, поэтому просто подождите пару часов и повторите шаг 1.\n\n🐞 Если у вас остались вопросы или вы столкнулись с багами, обязательно пишите сюда: https://github.com/shprttx/Proximity/issues\n\nСпасибо, что пользуетесь Proximity!",
+        "en": "Hello everyone\n\nI noticed that some users are having trouble updating utilities from GitHub. If an update fails to download, here are two simple solutions:\n\n1️⃣ Disable autostart for the utility you want to update. Toggle its autostart switch off, completely restart Proximity, and try updating again. This resolves the issue in most cases.\n\n2️⃣ If the first method didn't work, GitHub servers haven't finished processing the newly uploaded release files yet, so the app temporarily can't fetch them. I try to release updates on the same day, so just wait a couple of hours and repeat step 1.\n\n🐞 If you still have questions or encounter any bugs, please report them here: https://github.com/shprttx/Proximity/issues\n\nThank you for using Proximity!"
+      }
     }
-  }
-]
+  ]
 }
