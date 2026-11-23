@@ -18,9 +18,9 @@
   "engines": {
     "tg": {
       "name": "TG Proxy",
-      "version": "1.11.4",
-      "url": "https://raw.githubusercontent.com/shprttx/Proximity/main/engines/TG_1.11.4.zip",
-      "sha256": "0B1514351F864C49CE938F61B4F0E1B8FA5D9CF0F8802231762CBA7BB6323907",
+      "version": "1.12.0",
+      "url": "https://raw.githubusercontent.com/shprttx/Proximity/main/engines/TG_1.12.0.zip",
+      "sha256": "5B903ED02A2FB59E61632240E8517C47A65B344DB5493D9C50852C03FB497E62",
       "target": "TG"
     },
     "zprtx": {
